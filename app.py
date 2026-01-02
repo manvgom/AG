@@ -29,37 +29,45 @@ SCOPES = [
 ]
 REQUIRED_COLUMNS = ['name', 'total_seconds', 'status']
 
-# Helper to get configuration safely
-def get_secrets():
-    # Support both new st-gsheets-connection style (nested) and flat
-    if "connections" in st.secrets and "gsheets" in st.secrets.connections:
-        return st.secrets.connections.gsheets
-    return st.secrets
-
 # Persistence Functions using gspread
 def get_gc():
-    secrets = get_secrets()
+    # Use st.secrets direct access (flat structure preferred)
+    # Check if we have nested structure from previous config and unwrap if needed
+    if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+        secrets = st.secrets.connections.gsheets
+    else:
+        secrets = st.secrets
+
     # Create credentials from secrets dict
-    creds_dict = {
-        "type": secrets["type"],
-        "project_id": secrets["project_id"],
-        "private_key_id": secrets["private_key_id"],
-        "private_key": secrets["private_key"],
-        "client_email": secrets["client_email"],
-        "client_id": secrets["client_id"],
-        "auth_uri": secrets["auth_uri"],
-        "token_uri": secrets["token_uri"],
-        "auth_provider_x509_cert_url": secrets["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": secrets["client_x509_cert_url"],
-    }
+    try:
+        creds_dict = {
+            "type": secrets["type"],
+            "project_id": secrets["project_id"],
+            "private_key_id": secrets["private_key_id"],
+            "private_key": secrets["private_key"],
+            "client_email": secrets["client_email"],
+            "client_id": secrets["client_id"],
+            "auth_uri": secrets["auth_uri"],
+            "token_uri": secrets["token_uri"],
+            "auth_provider_x509_cert_url": secrets["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": secrets["client_x509_cert_url"],
+        }
+    except KeyError as e:
+        st.error(f"Missing secret key: {e}. Please check your secrets.toml or Cloud Secrets.")
+        st.stop()
+    
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
 
 def load_tasks():
     try:
         gc = get_gc()
-        secrets = get_secrets()
-        url = secrets.get("spreadsheet")
+        
+        # Resolve spreadsheet url similarly
+        if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+            url = st.secrets.connections.gsheets.get("spreadsheet")
+        else:
+            url = st.secrets.get("spreadsheet")
         
         if not url:
             st.error("Spreadsheet URL not found in secrets.")
@@ -98,8 +106,11 @@ def load_tasks():
 def save_tasks():
     try:
         gc = get_gc()
-        secrets = get_secrets()
-        url = secrets.get("spreadsheet")
+        
+        if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+            url = st.secrets.connections.gsheets.get("spreadsheet")
+        else:
+            url = st.secrets.get("spreadsheet")
         
         sh = gc.open_by_url(url)
         worksheet = sh.get_worksheet(0)
