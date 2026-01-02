@@ -113,10 +113,12 @@ def load_tasks():
         # Determine active task from DB
         for i, row in enumerate(data):
             try:
-                # Safely parse floats
-                total_sec = float(row.get('total_seconds', 0.0) or 0.0)
+                # Safely parse floats (handle comma decimals due to locale)
+                raw_sec = str(row.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                total_sec = float(raw_sec)
                 
-                start_ep = float(row.get('start_epoch', 0.0) or 0.0)
+                raw_ep = str(row.get('start_epoch', 0.0) or 0.0).replace(',', '.')
+                start_ep = float(raw_ep)
             except:
                 total_sec = 0.0
                 start_ep = 0.0
@@ -325,7 +327,11 @@ else:
             cols[2].markdown(f":{status_color}[{task['status']}]")
             
             # Duration Calculation
-            current_total = float(task.get('total_seconds', 0.0) or 0.0)
+            try:
+                raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                current_total = float(raw_val)
+            except:
+                current_total = 0.0
             
             # If running, add ONLY the elapsed time since start (don't mutate session state here)
             if is_running:
