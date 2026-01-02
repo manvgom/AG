@@ -86,19 +86,25 @@ def get_gc():
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
 
+# Helper: Parse HH:MM:SS to seconds
+def parse_time_str(time_str):
+    try:
+        parts = str(time_str).split(':')
+        if len(parts) == 3:
+            h, m, s = map(int, parts)
+            return h * 3600 + m * 60 + s
+    except:
+        pass
+    return 0.0
+
 def load_tasks():
     try:
         gc = get_gc()
-        
-        # Try to find spreadsheet url in the same creds block or root
         secrets = find_credentials(st.secrets)
         url = secrets.get("spreadsheet") if secrets else None
         
-        # If not in creds block, check keys roughly
         if not url:
-             if "spreadsheet" in st.secrets:
-                 url = st.secrets["spreadsheet"]
-             # Check legacy nested
+             if "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
              elif "connections" in st.secrets and "gsheets" in st.secrets.connections:
                  url = st.secrets.connections.gsheets.get("spreadsheet")
 
@@ -107,25 +113,25 @@ def load_tasks():
             return []
 
         sh = gc.open_by_url(url)
-        worksheet = sh.get_worksheet(0) # First sheet
-        
+        worksheet = sh.get_worksheet(0)
         data = worksheet.get_all_records()
         
         validated_data = []
         active_idx_found = None
         start_time_found = None
         
-        # Determine active task from DB
         for i, row in enumerate(data):
+            # SOURCE OF TRUTH: HH:MM:SS column ('formatted_time')
+            # We ignore 'total_seconds' from sheet to avoid the giant number bugs.
+            # We recalculate total_seconds from the clean string.
+            time_str = str(row.get('formatted_time', '00:00:00'))
+            total_sec = float(parse_time_str(time_str))
+            
+            # Start Epoch Logic
             try:
-                # Safely parse floats (handle comma decimals due to locale)
-                raw_sec = str(row.get('total_seconds', 0.0) or 0.0).replace(',', '.')
-                total_sec = float(raw_sec)
-                
                 raw_ep = str(row.get('start_epoch', 0.0) or 0.0).replace(',', '.')
                 start_ep = float(raw_ep)
             except:
-                total_sec = 0.0
                 start_ep = 0.0
             
             # If start_epoch is set (>0), this task is RUNNING
@@ -143,7 +149,6 @@ def load_tasks():
             }
             validated_data.append(clean_row)
         
-        # Restore session state from DB persistence
         if active_idx_found is not None:
             st.session_state.active_task_idx = active_idx_found
             st.session_state.start_time = start_time_found
@@ -151,8 +156,6 @@ def load_tasks():
         return validated_data
         
     except Exception as e:
-        # If sheet is empty (no headers), get_all_records might fail or return empty.
-        # Initialize headers if needed?
         st.warning(f"Could not load data (or empty sheet): {e}")
         return []
 
