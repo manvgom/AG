@@ -115,8 +115,6 @@ def load_tasks():
             try:
                 # Safely parse floats
                 total_sec = float(row.get('total_seconds', 0.0) or 0.0)
-                # Cap crazy values (corrupted data fix)
-                if total_sec > 3600 * 10000: total_sec = 0.0
                 
                 start_ep = float(row.get('start_epoch', 0.0) or 0.0)
             except:
