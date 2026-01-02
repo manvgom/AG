@@ -29,14 +29,46 @@ SCOPES = [
 ]
 REQUIRED_COLUMNS = ['name', 'total_seconds', 'status']
 
-# Persistence Functions using gspread
+# Helper: Find credentials dictionary recursively
+def find_credentials(secrets_proxy):
+    # Convert to standard dict to avoid AttrDict weirdness if necessary, 
+    # but strictly speaking st.secrets acts like a dict.
+    
+    # 1. Check root
+    if "private_key" in secrets_proxy:
+        return secrets_proxy
+        
+    # 2. Check first level items (e.g. [gsheets], [connections])
+    for key in secrets_proxy:
+        val = secrets_proxy[key]
+        # Check if item is dict-like
+        if hasattr(val, "keys"): 
+            if "private_key" in val:
+                return val
+            # 3. Check second level (e.g. [connections.gsheets])
+            for subkey in val:
+                subval = val[subkey]
+                if hasattr(subval, "keys") and "private_key" in subval:
+                    return subval
+    return None
+
 def get_gc():
-    # Use st.secrets direct access (flat structure preferred)
-    # Check if we have nested structure from previous config and unwrap if needed
-    if "connections" in st.secrets and "gsheets" in st.secrets.connections:
-        secrets = st.secrets.connections.gsheets
-    else:
-        secrets = st.secrets
+    secrets = find_credentials(st.secrets)
+    
+    if not secrets:
+        # Debugging aid: Show available keys (sanitized) to help user
+        st.error("❌ Credentials not found in secrets.")
+        st.warning("Debugging info - Secret Keys found:")
+        st.json(dict(st.secrets)) # Safe? This might show values if they are strings. 
+        # Better: just keys
+        keys_structure = {}
+        for k in st.secrets:
+            if hasattr(st.secrets[k], "keys"):
+                keys_structure[k] = list(st.secrets[k].keys())
+            else:
+                keys_structure[k] = "Value"
+        st.write("Keys Structure:", keys_structure)
+        st.stop()
 
     # Create credentials from secrets dict
     try:
@@ -53,7 +85,7 @@ def get_gc():
             "client_x509_cert_url": secrets["client_x509_cert_url"],
         }
     except KeyError as e:
-        st.error(f"Missing secret key: {e}. Please check your secrets.toml or Cloud Secrets.")
+        st.error(f"Missing required key in credentials: {e}")
         st.stop()
     
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
@@ -63,12 +95,18 @@ def load_tasks():
     try:
         gc = get_gc()
         
-        # Resolve spreadsheet url similarly
-        if "connections" in st.secrets and "gsheets" in st.secrets.connections:
-            url = st.secrets.connections.gsheets.get("spreadsheet")
-        else:
-            url = st.secrets.get("spreadsheet")
+        # Try to find spreadsheet url in the same creds block or root
+        secrets = find_credentials(st.secrets)
+        url = secrets.get("spreadsheet") if secrets else None
         
+        # If not in creds block, check keys roughly
+        if not url:
+             if "spreadsheet" in st.secrets:
+                 url = st.secrets["spreadsheet"]
+             # Check legacy nested
+             elif "connections" in st.secrets and "gsheets" in st.secrets.connections:
+                 url = st.secrets.connections.gsheets.get("spreadsheet")
+
         if not url:
             st.error("Spreadsheet URL not found in secrets.")
             return []
@@ -107,10 +145,16 @@ def save_tasks():
     try:
         gc = get_gc()
         
-        if "connections" in st.secrets and "gsheets" in st.secrets.connections:
-            url = st.secrets.connections.gsheets.get("spreadsheet")
-        else:
-            url = st.secrets.get("spreadsheet")
+        # Find URL (logic duplicated for safety, could be helper but inline involves less diff risk)
+        secrets = find_credentials(st.secrets)
+        url = secrets.get("spreadsheet") if secrets else None
+        
+        if not url and "spreadsheet" in st.secrets:
+             url = st.secrets["spreadsheet"]
+        
+        if not url:
+            st.error("Spreadsheet URL not found.")
+            return
         
         sh = gc.open_by_url(url)
         worksheet = sh.get_worksheet(0)
