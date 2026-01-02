@@ -1,14 +1,11 @@
 import streamlit as st
 import pandas as pd
 import time
-import os
 from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
 
 # Page configuration
 st.set_page_config(page_title="Time Tracker", page_icon="⏱️", layout="wide")
-
-# Constants
-TASKS_FILE = 'tasks.csv'
 
 # Custom CSS for premium look
 st.markdown("""
@@ -24,24 +21,40 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Persistence Functions
+# Helper: Ensure dataframe has correct columns
+REQUIRED_COLUMNS = ['name', 'total_seconds', 'status']
+
+# Persistence Functions using Google Sheets
+def get_connection():
+    return st.connection("gsheets", type=GSheetsConnection)
+
 def load_tasks():
-    if os.path.exists(TASKS_FILE):
-        try:
-            df = pd.read_csv(TASKS_FILE)
-            return df.to_dict('records')
-        except Exception:
+    conn = get_connection()
+    try:
+        # ttl=0 ensures we don't cache stale data on reload
+        df = conn.read(ttl=0) 
+        # Normalize columns if sheet is empty or weird
+        if df.empty or not all(col in df.columns for col in REQUIRED_COLUMNS):
             return []
-    return []
+        
+        # Fill NaN values to avoid errors
+        df = df.fillna({'name': '', 'total_seconds': 0, 'status': 'Pending'})
+        return df.to_dict('records')
+    except Exception as e:
+        st.error(f"Error loading from Google Sheets: {e}")
+        return []
 
 def save_tasks():
+    conn = get_connection()
     if st.session_state.tasks:
         df = pd.DataFrame(st.session_state.tasks)
-        df.to_csv(TASKS_FILE, index=False)
     else:
-        # Save empty dataframe to keep structure
-        df = pd.DataFrame(columns=['name', 'total_seconds', 'status'])
-        df.to_csv(TASKS_FILE, index=False)
+        df = pd.DataFrame(columns=REQUIRED_COLUMNS)
+    
+    try:
+        conn.update(data=df)
+    except Exception as e:
+        st.error(f"Error saving to Google Sheets: {e}")
 
 # Initialize session state for tasks
 if 'tasks' not in st.session_state:
@@ -108,12 +121,16 @@ def toggle_timer(index):
     save_tasks()
 
 def format_time(seconds):
-    m, s = divmod(int(seconds), 60)
+    try:
+        val = int(seconds)
+    except:
+        val = 0
+    m, s = divmod(val, 60)
     h, m = divmod(m, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 # Header
-st.title("⏱️ AG Time Tracker")
+st.title("⏱️ AG Time Tracker (Google Sheets Sync)")
 st.markdown("---")
 
 # Input Section
@@ -128,7 +145,7 @@ st.markdown("### My Tasks")
 
 # Task List
 if not st.session_state.tasks:
-    st.info("No tasks added yet. Start by adding one above!")
+    st.info("No tasks found. Add one to start tracking!")
 else:
     # Header row
     cols = st.columns([0.5, 3, 1.5, 1.5, 1.0, 0.5])
@@ -156,6 +173,12 @@ else:
             
             # Duration Calculation
             current_total = task['total_seconds']
+            # Safety check if total_seconds comes as string from sheets
+            try:
+                current_total = float(current_total)
+            except:
+                current_total = 0.0
+                
             if idx == st.session_state.active_task_idx:
                 current_total += (time.time() - st.session_state.start_time)
             
@@ -172,7 +195,6 @@ else:
     st.markdown("---")
 
     # Auto-refresh if timer is running
-    # Logic to ensure we don't spam updates unnecessarily for static views
     if st.session_state.active_task_idx is not None:
         time.sleep(1)
         st.rerun()
