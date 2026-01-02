@@ -101,11 +101,7 @@ else:
 
     # Render rows
     
-    # If a timer is running, we need to rerun the script every second to update UI
-    if st.session_state.active_task_idx is not None:
-        time.sleep(1)
-        st.rerun()
-
+    # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
             cols = st.columns([0.5, 3, 1.5, 1.5, 1.5])
@@ -133,4 +129,9 @@ else:
             cols[4].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,))
             
     st.markdown("---")
+
+    # Auto-refresh if timer is running
+    if st.session_state.active_task_idx is not None:
+        time.sleep(1)
+        st.rerun()
 
