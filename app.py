@@ -27,7 +27,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
-REQUIRED_COLUMNS = ['name', 'total_seconds', 'status']
+# Added start_epoch for persistence
+REQUIRED_COLUMNS = ['name', 'total_seconds', 'status', 'start_epoch']
 
 # Helper: Find credentials dictionary recursively
 def find_credentials(secrets_proxy):
@@ -56,18 +57,7 @@ def get_gc():
     secrets = find_credentials(st.secrets)
     
     if not secrets:
-        # Debugging aid: Show available keys (sanitized) to help user
-        st.error("❌ Credentials not found in secrets.")
-        st.warning("Debugging info - Secret Keys found:")
-        st.json(dict(st.secrets)) # Safe? This might show values if they are strings. 
-        # Better: just keys
-        keys_structure = {}
-        for k in st.secrets:
-            if hasattr(st.secrets[k], "keys"):
-                keys_structure[k] = list(st.secrets[k].keys())
-            else:
-                keys_structure[k] = "Value"
-        st.write("Keys Structure:", keys_structure)
+        st.error("❌ Credentials not found.")
         st.stop()
 
     # Create credentials from secrets dict
@@ -108,7 +98,7 @@ def load_tasks():
                  url = st.secrets.connections.gsheets.get("spreadsheet")
 
         if not url:
-            st.error("Spreadsheet URL not found in secrets.")
+            st.error("Spreadsheet URL not found.")
             return []
 
         sh = gc.open_by_url(url)
@@ -116,29 +106,49 @@ def load_tasks():
         
         data = worksheet.get_all_records()
         
-        if not data:
-            return []
-            
-        # Ensure columns exist in first row checks? 
-        # get_all_records uses first row as keys.
-        
-        # Normalize and Validation
         validated_data = []
-        for row in data:
-            # Basic validation/cleaning
+        active_idx_found = None
+        start_time_found = None
+        
+        # Determine active task from DB
+        for i, row in enumerate(data):
+            try:
+                # Safely parse floats
+                total_sec = float(row.get('total_seconds', 0.0) or 0.0)
+                # Cap crazy values (corrupted data fix)
+                if total_sec > 3600 * 10000: total_sec = 0.0
+                
+                start_ep = float(row.get('start_epoch', 0.0) or 0.0)
+            except:
+                total_sec = 0.0
+                start_ep = 0.0
+            
+            # If start_epoch is set (>0), this task is RUNNING
+            status = str(row.get('status', 'Pending'))
+            if start_ep > 0:
+                active_idx_found = i
+                start_time_found = start_ep
+                status = 'Running ⏱️' 
+            
             clean_row = {
                 'name': str(row.get('name', '')),
-                'total_seconds': float(row.get('total_seconds', 0.0) or 0.0),
-                'status': str(row.get('status', 'Pending'))
+                'total_seconds': total_sec,
+                'status': status,
+                'start_epoch': start_ep
             }
             validated_data.append(clean_row)
+        
+        # Restore session state from DB persistence
+        if active_idx_found is not None:
+            st.session_state.active_task_idx = active_idx_found
+            st.session_state.start_time = start_time_found
             
         return validated_data
         
     except Exception as e:
         # If sheet is empty (no headers), get_all_records might fail or return empty.
         # Initialize headers if needed?
-        st.warning(f"Could not load data (New sheet?): {e}")
+        st.warning(f"Could not load data (or empty sheet): {e}")
         return []
 
 def save_tasks():
@@ -170,7 +180,8 @@ def save_tasks():
             row = [
                 task.get('name', ''),
                 task.get('total_seconds', 0),
-                task.get('status', 'Pending')
+                task.get('status', 'Pending'),
+                task.get('start_epoch', 0.0) # Persist start time!
             ]
             values.append(row)
             
@@ -184,7 +195,7 @@ def save_tasks():
 if 'tasks' not in st.session_state:
     st.session_state.tasks = load_tasks()
 
-# Initialize session state for active timer
+# Initialize session state placeholders if not set by load_tasks
 if 'active_task_idx' not in st.session_state:
     st.session_state.active_task_idx = None
 if 'start_time' not in st.session_state:
@@ -196,21 +207,19 @@ def add_task():
         st.session_state.tasks.append({
             'name': task_name,
             'total_seconds': 0,
-            'status': 'Pending'
+            'status': 'Pending',
+            'start_epoch': 0.0
         })
         st.session_state.new_task_input = "" # Clear input
         save_tasks()
 
 def delete_task(index):
-    # Handle active timer logic before deletion
-    if st.session_state.active_task_idx is not None:
-        if st.session_state.active_task_idx == index:
-            # We are deleting the running task. Stop timer first.
-            st.session_state.active_task_idx = None
-            st.session_state.start_time = None
-        elif st.session_state.active_task_idx > index:
-            # We are deleting a task above the running one. Shift index down.
-            st.session_state.active_task_idx -= 1
+    # Stop timer if deleting active task
+    if st.session_state.active_task_idx == index:
+        st.session_state.active_task_idx = None
+        st.session_state.start_time = None
+    elif st.session_state.active_task_idx is not None and st.session_state.active_task_idx > index:
+        st.session_state.active_task_idx -= 1
             
     st.session_state.tasks.pop(index)
     save_tasks()
@@ -218,29 +227,41 @@ def delete_task(index):
 def toggle_timer(index):
     current_time = time.time()
     
-    # If starting a new timer (and one was already running), stop the old one first
+    # 1. Stop distinct previous task if running
     if st.session_state.active_task_idx is not None and st.session_state.active_task_idx != index:
-        # Stop previous
         prev_idx = st.session_state.active_task_idx
-        elapsed = current_time - st.session_state.start_time
+        prev_start = st.session_state.tasks[prev_idx].get('start_epoch', current_time)
+        
+        # Calculate delta
+        elapsed = current_time - prev_start
+        if elapsed < 0: elapsed = 0 # Safety
+        
         st.session_state.tasks[prev_idx]['total_seconds'] += elapsed
         st.session_state.tasks[prev_idx]['status'] = 'Paused'
+        st.session_state.tasks[prev_idx]['start_epoch'] = 0.0 # Clear persistence
+        
         st.session_state.active_task_idx = None
         st.session_state.start_time = None
 
-    # Toggle current
+    # 2. Toggle clicked task
     if st.session_state.active_task_idx == index:
-        # Stop
-        elapsed = current_time - st.session_state.start_time
+        # STOP
+        start_t = st.session_state.tasks[index].get('start_epoch', current_time)
+        elapsed = current_time - start_t
+        if elapsed < 0: elapsed = 0
+        
         st.session_state.tasks[index]['total_seconds'] += elapsed
         st.session_state.tasks[index]['status'] = 'Paused'
+        st.session_state.tasks[index]['start_epoch'] = 0.0 # Clear
+        
         st.session_state.active_task_idx = None
         st.session_state.start_time = None
     else:
-        # Start
+        # START
         st.session_state.active_task_idx = index
         st.session_state.start_time = current_time
         st.session_state.tasks[index]['status'] = 'Running ⏱️'
+        st.session_state.tasks[index]['start_epoch'] = current_time # Set persistence
     
     save_tasks()
 
@@ -292,25 +313,24 @@ else:
             cols[1].text(task['name'])
             
             # Status
-            status_color = "green" if idx == st.session_state.active_task_idx else "grey"
+            is_running = (idx == st.session_state.active_task_idx)
+            status_color = "green" if is_running else "grey"
             cols[2].markdown(f":{status_color}[{task['status']}]")
             
             # Duration Calculation
-            current_total = task['total_seconds']
-            # Safety check if total_seconds comes as string from sheets
-            try:
-                current_total = float(current_total)
-            except:
-                current_total = 0.0
-                
-            if idx == st.session_state.active_task_idx:
-                current_total += (time.time() - st.session_state.start_time)
+            current_total = float(task.get('total_seconds', 0.0) or 0.0)
+            
+            # If running, add ONLY the elapsed time since start (don't mutate session state here)
+            if is_running:
+                # Use stored start_time for smooth UI updates
+                start_t = st.session_state.start_time or time.time()
+                current_total += (time.time() - start_t)
             
             cols[3].code(format_time(current_total))
             
             # Action Button
-            btn_label = "Stop" if idx == st.session_state.active_task_idx else "Start"
-            btn_type = "primary" if idx == st.session_state.active_task_idx else "secondary"
+            btn_label = "Stop" if is_running else "Start"
+            btn_type = "primary" if is_running else "secondary"
             cols[4].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
             
             # Delete Button
@@ -322,3 +342,4 @@ else:
     if st.session_state.active_task_idx is not None:
         time.sleep(1)
         st.rerun()
+```
