@@ -28,7 +28,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 # Added start_epoch for persistence, formatted_time for readability
-REQUIRED_COLUMNS = ['name', 'total_seconds', 'formatted_time', 'status', 'start_epoch']
+REQUIRED_COLUMNS = ['name', 'formatted_time', 'status', 'start_epoch']
 
 # Helper: Format seconds to HH:MM:SS
 def format_time(seconds):
@@ -196,7 +196,6 @@ def save_tasks():
             
             row = [
                 task.get('name', ''),
-                t_sec,
                 format_time(t_sec), # Human readable column
                 task.get('status', 'Pending'),
                 task.get('start_epoch', 0.0) 
