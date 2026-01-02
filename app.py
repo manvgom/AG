@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import time
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
+import gspread
+from google.oauth2.service_account import Credentials
 
 # Page configuration
 st.set_page_config(page_title="Time Tracker", page_icon="⏱️", layout="wide")
@@ -21,38 +22,106 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Helper: Ensure dataframe has correct columns
+# Constants
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
 REQUIRED_COLUMNS = ['name', 'total_seconds', 'status']
 
-# Persistence Functions using Google Sheets
-def get_connection():
-    return st.connection("gsheets", type=GSheetsConnection)
+# Helper to get configuration safely
+def get_secrets():
+    # Support both new st-gsheets-connection style (nested) and flat
+    if "connections" in st.secrets and "gsheets" in st.secrets.connections:
+        return st.secrets.connections.gsheets
+    return st.secrets
+
+# Persistence Functions using gspread
+def get_gc():
+    secrets = get_secrets()
+    # Create credentials from secrets dict
+    creds_dict = {
+        "type": secrets["type"],
+        "project_id": secrets["project_id"],
+        "private_key_id": secrets["private_key_id"],
+        "private_key": secrets["private_key"],
+        "client_email": secrets["client_email"],
+        "client_id": secrets["client_id"],
+        "auth_uri": secrets["auth_uri"],
+        "token_uri": secrets["token_uri"],
+        "auth_provider_x509_cert_url": secrets["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": secrets["client_x509_cert_url"],
+    }
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    return gspread.authorize(creds)
 
 def load_tasks():
-    conn = get_connection()
     try:
-        # ttl=0 ensures we don't cache stale data on reload
-        df = conn.read(ttl=0) 
-        # Normalize columns if sheet is empty or weird
-        if df.empty or not all(col in df.columns for col in REQUIRED_COLUMNS):
-            return []
+        gc = get_gc()
+        secrets = get_secrets()
+        url = secrets.get("spreadsheet")
         
-        # Fill NaN values to avoid errors
-        df = df.fillna({'name': '', 'total_seconds': 0, 'status': 'Pending'})
-        return df.to_dict('records')
+        if not url:
+            st.error("Spreadsheet URL not found in secrets.")
+            return []
+
+        sh = gc.open_by_url(url)
+        worksheet = sh.get_worksheet(0) # First sheet
+        
+        data = worksheet.get_all_records()
+        
+        if not data:
+            return []
+            
+        # Ensure columns exist in first row checks? 
+        # get_all_records uses first row as keys.
+        
+        # Normalize and Validation
+        validated_data = []
+        for row in data:
+            # Basic validation/cleaning
+            clean_row = {
+                'name': str(row.get('name', '')),
+                'total_seconds': float(row.get('total_seconds', 0.0) or 0.0),
+                'status': str(row.get('status', 'Pending'))
+            }
+            validated_data.append(clean_row)
+            
+        return validated_data
+        
     except Exception as e:
-        st.error(f"Error loading from Google Sheets: {e}")
+        # If sheet is empty (no headers), get_all_records might fail or return empty.
+        # Initialize headers if needed?
+        st.warning(f"Could not load data (New sheet?): {e}")
         return []
 
 def save_tasks():
-    conn = get_connection()
-    if st.session_state.tasks:
-        df = pd.DataFrame(st.session_state.tasks)
-    else:
-        df = pd.DataFrame(columns=REQUIRED_COLUMNS)
-    
     try:
-        conn.update(data=df)
+        gc = get_gc()
+        secrets = get_secrets()
+        url = secrets.get("spreadsheet")
+        
+        sh = gc.open_by_url(url)
+        worksheet = sh.get_worksheet(0)
+        
+        # Prepare data for sheet
+        # Row 1: Headers
+        # Row 2+: Data
+        
+        headers = REQUIRED_COLUMNS
+        
+        values = [headers]
+        for task in st.session_state.tasks:
+            row = [
+                task.get('name', ''),
+                task.get('total_seconds', 0),
+                task.get('status', 'Pending')
+            ]
+            values.append(row)
+            
+        worksheet.clear()
+        worksheet.update(values)
+        
     except Exception as e:
         st.error(f"Error saving to Google Sheets: {e}")
 
@@ -130,7 +199,7 @@ def format_time(seconds):
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 # Header
-st.title("⏱️ AG Time Tracker (Google Sheets Sync)")
+st.title("⏱️ AG Time Tracker (GSpread Edition)")
 st.markdown("---")
 
 # Input Section
