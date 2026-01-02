@@ -27,26 +27,31 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
-# Added start_epoch for persistence
-REQUIRED_COLUMNS = ['name', 'total_seconds', 'status', 'start_epoch']
+# Added start_epoch for persistence, formatted_time for readability
+REQUIRED_COLUMNS = ['name', 'total_seconds', 'formatted_time', 'status', 'start_epoch']
+
+# Helper: Format seconds to HH:MM:SS
+def format_time(seconds):
+    try:
+        # Handle string floats "12.5" -> 12
+        val = int(float(seconds))
+    except:
+        val = 0
+    m, s = divmod(val, 60)
+    h, m = divmod(m, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 # Helper: Find credentials dictionary recursively
 def find_credentials(secrets_proxy):
-    # Convert to standard dict to avoid AttrDict weirdness if necessary, 
-    # but strictly speaking st.secrets acts like a dict.
-    
-    # 1. Check root
+    # ... (content remains same, just ensuring format_time is above) ...
+    # To avoid huge diff, I will just replicate find_credentials lines if needed or assume I can't move blocks easily with replace_file without reprinting content.
     if "private_key" in secrets_proxy:
         return secrets_proxy
-        
-    # 2. Check first level items (e.g. [gsheets], [connections])
     for key in secrets_proxy:
         val = secrets_proxy[key]
-        # Check if item is dict-like
         if hasattr(val, "keys"): 
             if "private_key" in val:
                 return val
-            # 3. Check second level (e.g. [connections.gsheets])
             for subkey in val:
                 subval = val[subkey]
                 if hasattr(subval, "keys") and "private_key" in subval:
@@ -177,11 +182,21 @@ def save_tasks():
         
         values = [headers]
         for task in st.session_state.tasks:
+            # Calculate current total for display/saving (if running, use snapshot)
+            # Actually, save_tasks usually saves the 'base' total_seconds.
+            # If running, we might want to save the *current* elapsed? 
+            # No, 'start_epoch' handles the running part. 'total_seconds' is the stored accumulator.
+            # But the user wants 'formatted_time' to look correct.
+            # We'll formatting the STored total_seconds.
+            
+            t_sec = task.get('total_seconds', 0)
+            
             row = [
                 task.get('name', ''),
-                task.get('total_seconds', 0),
+                t_sec,
+                format_time(t_sec), # Human readable column
                 task.get('status', 'Pending'),
-                task.get('start_epoch', 0.0) # Persist start time!
+                task.get('start_epoch', 0.0) 
             ]
             values.append(row)
             
@@ -274,14 +289,7 @@ def toggle_timer(index):
     
     save_tasks()
 
-def format_time(seconds):
-    try:
-        val = int(seconds)
-    except:
-        val = 0
-    m, s = divmod(val, 60)
-    h, m = divmod(m, 60)
-    return f"{h:02d}:{m:02d}:{s:02d}"
+
 
 # Header
 st.title("⏱️ AG Time Tracker (GSpread Edition)")
