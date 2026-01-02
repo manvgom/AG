@@ -230,15 +230,19 @@ def toggle_timer(index):
     # 1. Stop distinct previous task if running
     if st.session_state.active_task_idx is not None and st.session_state.active_task_idx != index:
         prev_idx = st.session_state.active_task_idx
-        prev_start = st.session_state.tasks[prev_idx].get('start_epoch', current_time)
+        prev_start = st.session_state.tasks[prev_idx].get('start_epoch', 0.0)
+        
+        # Safety: If start_epoch is missing/0, assume we just started (0 elapsed) to avoid 120-year bug
+        if prev_start == 0.0:
+            prev_start = current_time
         
         # Calculate delta
         elapsed = current_time - prev_start
-        if elapsed < 0: elapsed = 0 # Safety
+        if elapsed < 0: elapsed = 0 
         
         st.session_state.tasks[prev_idx]['total_seconds'] += elapsed
         st.session_state.tasks[prev_idx]['status'] = 'Paused'
-        st.session_state.tasks[prev_idx]['start_epoch'] = 0.0 # Clear persistence
+        st.session_state.tasks[prev_idx]['start_epoch'] = 0.0 
         
         st.session_state.active_task_idx = None
         st.session_state.start_time = None
@@ -246,13 +250,18 @@ def toggle_timer(index):
     # 2. Toggle clicked task
     if st.session_state.active_task_idx == index:
         # STOP
-        start_t = st.session_state.tasks[index].get('start_epoch', current_time)
+        start_t = st.session_state.tasks[index].get('start_epoch', 0.0)
+        
+        # Safety check
+        if start_t == 0.0:
+            start_t = current_time
+            
         elapsed = current_time - start_t
         if elapsed < 0: elapsed = 0
         
         st.session_state.tasks[index]['total_seconds'] += elapsed
         st.session_state.tasks[index]['status'] = 'Paused'
-        st.session_state.tasks[index]['start_epoch'] = 0.0 # Clear
+        st.session_state.tasks[index]['start_epoch'] = 0.0 
         
         st.session_state.active_task_idx = None
         st.session_state.start_time = None
@@ -261,7 +270,7 @@ def toggle_timer(index):
         st.session_state.active_task_idx = index
         st.session_state.start_time = current_time
         st.session_state.tasks[index]['status'] = 'Running ⏱️'
-        st.session_state.tasks[index]['start_epoch'] = current_time # Set persistence
+        st.session_state.tasks[index]['start_epoch'] = current_time 
     
     save_tasks()
 
