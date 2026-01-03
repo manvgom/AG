@@ -620,7 +620,6 @@ with tab_analytics:
                 df['DisplayID'] = df['id'].astype(str).where(df['id'].astype(str) != "", df['name'])
                 df_id = df.groupby('DisplayID')['Hours'].sum().sort_values(ascending=False)
                 st.bar_chart(df_id)
-            st.bar_chart(df_id)
 
 # Auto-refresh if timer is running
 if st.session_state.active_task_idx is not None:
