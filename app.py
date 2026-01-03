@@ -120,6 +120,8 @@ def load_tasks():
 
         sh = gc.open_by_url(url)
         worksheet = sh.get_worksheet(0)
+        if worksheet.title != "General":
+            worksheet.update_title("General")
         data = worksheet.get_all_records()
         
         validated_data = []
@@ -186,6 +188,8 @@ def save_tasks():
         
         sh = gc.open_by_url(url)
         worksheet = sh.get_worksheet(0)
+        if worksheet.title != "General":
+            worksheet.update_title("General")
         
         # Prepare data for sheet
         # Row 1: Headers
