@@ -465,31 +465,7 @@ with tab_tracker:
         with col_f3:
             filter_date = st.date_input("Filter by Date Range", value=[], help="Select a range")
 
-    # Export Button (Tracker)
-    if filtered_tasks:
-        export_data = []
-        for _, t in filtered_tasks:
-            # Flatten for CSV
-            row = t.copy()
-            # Format time for readability
-            row['formatted_time'] = format_time(row.get('total_seconds', 0))
-            export_data.append(row)
-        
-        df_export = pd.DataFrame(export_data)
-        # Reorder/Select columns
-        cols_to_export = ['id', 'name', 'category', 'status', 'formatted_time', 'notes', 'created_date']
-        # Handle case where some keys might be missing if empty
-        existing_cols = [c for c in cols_to_export if c in df_export.columns]
-        df_export = df_export[existing_cols]
-        
-        csv = df_export.to_csv(index=False).encode('utf-8')
-        
-        st.download_button(
-            label="📥 Download Tasks (CSV)",
-            data=csv,
-            file_name=f"tasks_export_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv",
-        )
+
 
     # Task List Logic
     if not st.session_state.tasks:
@@ -540,6 +516,27 @@ with tab_tracker:
         if not filtered_tasks:
             st.warning("No tasks match your filters.")
         else:
+            # Export Button (Tracker)
+            export_data = []
+            for _, t in filtered_tasks:
+                row = t.copy()
+                row['formatted_time'] = format_time(row.get('total_seconds', 0))
+                export_data.append(row)
+            
+            df_export = pd.DataFrame(export_data)
+            cols_to_export = ['id', 'name', 'category', 'status', 'formatted_time', 'notes', 'created_date']
+            existing_cols = [c for c in cols_to_export if c in df_export.columns]
+            df_export = df_export[existing_cols]
+            
+            csv = df_export.to_csv(index=False).encode('utf-8')
+            
+            st.download_button(
+                label="📥 Download Tasks (CSV)",
+                data=csv,
+                file_name=f"tasks_export_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+            )
+            
             # Group filtered tasks by (id, name) to avoid duplication
             # groups: dict[key: tuple(id, name)] -> list[tuple(index, task)]
             groups = {}
