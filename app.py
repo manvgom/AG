@@ -882,12 +882,10 @@ with tab_tracker:
                         running_in_group = True
                 
                 header_duration = format_time(group_total_seconds)
-                # Counter [X/Y]
-                progress_str = f"[{completed_subtasks}/{total_subtasks}]"
                 
-                # New Format: II2025029 - MES Fase IV - [00:01:25] - [0/2]
+                # New Format: II2025029 - MES Fase IV - [00:01:25]
                 id_part = g_id if g_id else 'No ID'
-                header_str = f"**{id_part}** - {g_name} - [{header_duration}] - {progress_str}"
+                header_str = f"**{id_part}** - {g_name} - [{header_duration}]"
                 
                 if running_in_group:
                     header_str = "🟢 " + header_str
@@ -899,41 +897,22 @@ with tab_tracker:
                 
                 with st.expander(header_str, expanded=is_expanded):
                     # Header row for the group content
-                    # Col widths: Category, Date, Status, Duration, Action, Edit, Note, Del
-                    h_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                    # Col widths: Category, Date, Duration, Action, Edit, Note, Del
+                    h_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                     h_cols[0].markdown("**Category**")
                     h_cols[1].markdown("**Date**")
-                    h_cols[2].markdown("**Status**")
-                    h_cols[3].markdown("**Duration**")
+                    h_cols[2].markdown("**Duration**")
                     
                     for idx, task in g_tasks:
-                        r_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                        r_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
                         # Category
                         r_cols[0].text(task.get('category', ''))
                         # Date
                         r_cols[1].text(task.get('created_date', '-'))
                         
-                        # Status Logic
                         is_running = (idx == st.session_state.active_task_idx)
-                        current_status = task.get('status', 'To Do')
                         
-                        # Special "Doing" state
-                        if is_running:
-                            r_cols[2].markdown("**:orange[Doing ⚡]**")
-                        else:
-                            # Status: Checkbox Only
-                            # 1. Checkbox ("Done")
-                            is_done = (current_status == 'Done')
-                            if r_cols[2].checkbox("Done", value=is_done, key=f"chk_done_{idx}", label_visibility="collapsed"):
-                                if not is_done:
-                                    update_status(idx, 'Done')
-                                    st.rerun()
-                            else:
-                                if is_done:
-                                    update_status(idx, 'To Do')
-                                    st.rerun()
-
                         # Duration Calculation
                         try:
                             raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
@@ -947,31 +926,31 @@ with tab_tracker:
                         
                         dur_str = format_time(current_total)
                         if is_running:
-                             r_cols[3].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                             r_cols[2].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
                         else:
-                             r_cols[3].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
+                             r_cols[2].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
                         
                         # Buttons
                         btn_label = "⏹️" if is_running else "▶️"
                         btn_type = "primary" if is_running else "secondary"
-                        btn_disabled = (not is_running) and (current_status == 'Done')
+                        # No more blocked button by status
                         
-                        r_cols[4].button(
+                        r_cols[3].button(
                             btn_label, 
                             key=f"btn_{idx}", 
                             type=btn_type, 
                             on_click=toggle_timer, 
                             args=(idx,), 
-                            use_container_width=True,
-                            disabled=btn_disabled
+                            use_container_width=True
                         )
                         
-                        if r_cols[5].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True):
+                            
+                        if r_cols[4].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True):
                             pass
 
-                        r_cols[6].button("📄", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        r_cols[5].button("📄", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
                         
-                        if r_cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                        if r_cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                             pass
                             
                         # Notes Area
