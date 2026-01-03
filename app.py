@@ -436,80 +436,7 @@ def toggle_timer(index):
 
 
 # Header
-# --- FILTERS (SIDEBAR) ---
-with st.sidebar:
-    st.header("🔎 Filters")
-    search_query = st.text_input("Search (ID/Desc)", placeholder="Type to search...").lower()
-    filter_categories = st.multiselect("Category", CATEGORIES)
-    filter_date = st.date_input("Date Range", value=[], help="Select a range")
-    st.markdown("---")
-
-# --- FILTERING LOGIC (HOISTED) ---
-filtered_tasks = []
-if st.session_state.tasks:
-    for i, t in enumerate(st.session_state.tasks):
-        # Match Search
-        match_search = True
-        if search_query:
-            id_match = search_query in str(t.get('id', '')).lower()
-            desc_match = search_query in str(t.get('name', '')).lower()
-            match_search = id_match or desc_match
-        
-        # Match Category
-        match_cat = True
-        if filter_categories:
-            match_cat = t.get('category') in filter_categories
-        
-        # Match Date
-        match_date = True
-        if filter_date:
-            try:
-                task_dt = datetime.strptime(t.get('created_date', ''), "%d/%m/%Y").date()
-            except:
-                task_dt = None
-            
-            if not task_dt:
-                 match_date = False 
-            else:
-                if len(filter_date) == 1:
-                    if task_dt != filter_date[0]:
-                        match_date = False
-                elif len(filter_date) == 2:
-                    start_d, end_d = filter_date
-                    if not (start_d <= task_dt <= end_d):
-                        match_date = False
-            
-        if match_search and match_cat and match_date:
-            filtered_tasks.append((i, t))
-
-# --- HEADER & EXPORT ---
-col_head, col_export = st.columns([6, 2], vertical_alignment="center")
-with col_head:
-    st.title("⏱️ Tasks Monitor")
-
-with col_export:
-    if filtered_tasks:
-        export_data = []
-        for _, t in filtered_tasks:
-            row = t.copy()
-            row['formatted_time'] = format_time(row.get('total_seconds', 0))
-            export_data.append(row)
-        
-        df_export = pd.DataFrame(export_data)
-        cols_to_export = ['id', 'name', 'category', 'status', 'formatted_time', 'notes', 'created_date']
-        existing_cols = [c for c in cols_to_export if c in df_export.columns]
-        df_export = df_export[existing_cols]
-        
-        csv = df_export.to_csv(index=False).encode('utf-8')
-        
-        st.download_button(
-            label="📥 Download (CSV)",
-            data=csv,
-            file_name=f"tasks_export_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-
+st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
 # Tabs
@@ -528,22 +455,65 @@ with tab_tracker:
     with col3:
         st.button("Add", on_click=add_task, use_container_width=True)
 
-
-
-
+    # Filters
+    with st.expander("🔎 Filters", expanded=False):
+        col_f1, col_f2, col_f3 = st.columns([2, 1.5, 1.5])
+        with col_f1:
+            search_query = st.text_input("Search (ID or Description)", placeholder="Type to search...").lower()
+        with col_f2:
+            filter_categories = st.multiselect("Filter by Category", CATEGORIES)
+        with col_f3:
+            filter_date = st.date_input("Filter by Date Range", value=[], help="Select a range")
 
     # Task List Logic
     if not st.session_state.tasks:
         st.info("No tasks found. Add one to start tracking!")
     else:
-        # Filtering is now done globally above
-        pass
+        # 1. Filter Logic
+        filtered_tasks = []
+        for i, t in enumerate(st.session_state.tasks):
+            # Match Search
+            match_search = True
+            if search_query:
+                id_match = search_query in str(t.get('id', '')).lower()
+                desc_match = search_query in str(t.get('name', '')).lower()
+                match_search = id_match or desc_match
+            
+            # Match Category
+            match_cat = True
+            if filter_categories:
+                match_cat = t.get('category') in filter_categories
+            
+            # Match Date
+            match_date = True
+            if filter_date:
+                try:
+                    task_dt = datetime.strptime(t.get('created_date', ''), "%d/%m/%Y").date()
+                except:
+                    task_dt = None
+                
+                # Careful: st.date_input with value=[] can return [] or partial tuple
+                # If user hasn't selected anything, filter_date might be empty list -> False
+                # If user selected one date -> tuple length 1
+                
+                if not task_dt:
+                     # If task has no date, exclude it if filter is active
+                     match_date = False 
+                else:
+                    if len(filter_date) == 1:
+                        if task_dt != filter_date[0]:
+                            match_date = False
+                    elif len(filter_date) == 2:
+                        start_d, end_d = filter_date
+                        if not (start_d <= task_dt <= end_d):
+                            match_date = False
+                
+            if match_search and match_cat and match_date:
+                filtered_tasks.append((i, t))
 
         if not filtered_tasks:
             st.warning("No tasks match your filters.")
         else:
-
-            
             # Group filtered tasks by (id, name) to avoid duplication
             # groups: dict[key: tuple(id, name)] -> list[tuple(index, task)]
             groups = {}
