@@ -302,7 +302,7 @@ def update_notes():
             st.session_state.tasks[idx]['notes'] = st.session_state[key]
             save_tasks()
 
-def log_session(task_name, category, elapsed_seconds):
+def log_session(task_name, category, elapsed_seconds, start_epoch, end_epoch):
     """Appends a new row to the 'Logs' worksheet."""
     try:
         if elapsed_seconds < 1: return # Ignore accidental clicks
@@ -320,21 +320,43 @@ def log_session(task_name, category, elapsed_seconds):
         try:
             ws_logs = sh.worksheet("Logs")
         except:
-            ws_logs = sh.add_worksheet(title="Logs", rows=1000, cols=5)
-            ws_logs.append_row(["Date", "Task Name", "Category", "Duration (s)", "Duration (Formatted)"])
+            ws_logs = sh.add_worksheet(title="Logs", rows=1000, cols=8)
+            # Headers with detailed info
+            ws_logs.append_row([
+                "Task Name", 
+                "Category", 
+                "Start Date", 
+                "End Date", 
+                "Start Time", 
+                "End Time", 
+                "Duration (s)", 
+                "Duration (Formatted)"
+            ])
             
+        # Format Timestamps
+        start_dt = datetime.fromtimestamp(start_epoch)
+        end_dt = datetime.fromtimestamp(end_epoch)
+        
+        start_date_str = start_dt.strftime("%d/%m/%Y")
+        end_date_str = end_dt.strftime("%d/%m/%Y")
+        start_time_str = start_dt.strftime("%H:%M:%S")
+        end_time_str = end_dt.strftime("%H:%M:%S")
+        
         # Append log data
-        today_str = datetime.now().strftime("%d/%m/%Y")
         ws_logs.append_row([
-            today_str,
             task_name,
             category,
+            start_date_str,
+            end_date_str,
+            start_time_str,
+            end_time_str,
             elapsed_seconds,
             format_time(elapsed_seconds)
         ])
         
     except Exception as e:
-        st.warning(f"Could not log session: {e}")
+        print(f"Log Error: {e}") # Silent fail in UI but print to console
+        # st.warning(f"Could not log session: {e}")
 
 @st.dialog("⚠️ Delete Task")
 def delete_confirmation(index):
@@ -446,7 +468,13 @@ def toggle_timer(index):
         st.session_state.tasks[prev_idx]['start_epoch'] = 0.0
         
         # Log session
-        log_session(st.session_state.tasks[prev_idx].get('name', ''), st.session_state.tasks[prev_idx].get('category', ''), elapsed)
+        log_session(
+            st.session_state.tasks[prev_idx].get('name', ''), 
+            st.session_state.tasks[prev_idx].get('category', ''), 
+            elapsed,
+            prev_start,
+            current_time
+        )
         
         st.session_state.active_task_idx = None
         st.session_state.start_time = None
@@ -466,7 +494,7 @@ st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
 # Tabs
-tab_tracker, tab_analytics = st.tabs(["Tracker", "Analytics"])
+tab_tracker, tab_analytics, tab_logs = st.tabs(["Tracker", "Analytics", "📜 Logs"])
 
 with tab_tracker:
     # Input Section
@@ -769,6 +797,57 @@ with tab_analytics:
             st.altair_chart(bar_chart, use_container_width=True)
 
 
+
+            )
+            st.altair_chart(bar_chart, use_container_width=True)
+
+with tab_logs:
+    st.subheader("📜 Session History")
+    
+    # Load Logs Button (to avoid slow load on every refresh)
+    if st.button("🔄 Refresh Logs"):
+        st.session_state.logs_data = None
+        
+    if "logs_data" not in st.session_state or st.session_state.logs_data is None:
+        # Load logic specific for logs
+        try:
+            gc = get_gc()
+            secrets = find_credentials(st.secrets)
+            url = secrets.get("spreadsheet") if secrets else None
+            # Fallback
+            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+            
+            if url:
+                sh = gc.open_by_url(url)
+                try:
+                    ws_logs = sh.worksheet("Logs")
+                    data = ws_logs.get_all_records()
+                    st.session_state.logs_data = pd.DataFrame(data)
+                except gspread.WorksheetNotFound:
+                    st.session_state.logs_data = pd.DataFrame() # Empty
+                except Exception as e:
+                    st.error(f"Error loading logs: {e}")
+                    st.session_state.logs_data = pd.DataFrame()
+        except:
+            pass
+
+    if "logs_data" in st.session_state and isinstance(st.session_state.logs_data, pd.DataFrame):
+        df_log = st.session_state.logs_data
+        if not df_log.empty:
+            # Show newest first
+            st.dataframe(df_log, use_container_width=True)
+            
+            # Optional: CSV Download for Logs
+            csv_logs = df_log.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                "📥 Download Logs (CSV)",
+                csv_logs,
+                "session_logs.csv",
+                "text/csv",
+                key='download-logs'
+            )
+        else:
+            st.info("No logs found yet.")
 
 # Auto-refresh if timer is running
 if st.session_state.active_task_idx is not None:
