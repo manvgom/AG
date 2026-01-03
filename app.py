@@ -220,14 +220,18 @@ if 'start_time' not in st.session_state:
 
 def add_task():
     task_name = st.session_state.new_task_input
+    task_category = st.session_state.get("new_category_input", "") # Safely get category
+    
     if task_name:
         st.session_state.tasks.append({
             'name': task_name,
+            'category': task_category,
             'total_seconds': 0,
             'status': 'Pending',
             'start_epoch': 0.0
         })
         st.session_state.new_task_input = "" # Clear input
+        st.session_state.new_category_input = "" # Clear category input
         save_tasks()
 
 def delete_task(index):
