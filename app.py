@@ -360,36 +360,41 @@ st.markdown("### My Tasks")
 if not st.session_state.tasks:
     st.info("No tasks found. Add one to start tracking!")
 else:
-    # Header row (Added Category column)
-    # Col widths: Index, Name, Category, Status, Duration, Action, Note, Del
-    cols = st.columns([0.5, 3, 2, 1.5, 1.5, 0.5, 0.5, 0.5])
+    # Header row
+    # Col widths: Index (#), Date, Name, Category, Status, Duration, Action, Note, Del
+    # Adjusted weights: 0.5, 1.2, 2.5, 1.8, 1.3, 1.2, 0.5, 0.5, 0.5 = 10.0
+    cols = st.columns([0.5, 1.2, 2.5, 1.8, 1.3, 1.2, 0.5, 0.5, 0.5])
     cols[0].markdown("**#**")
-    cols[1].markdown("**Task Name**")
-    cols[2].markdown("**Category**")
-    cols[3].markdown("**Status**")
-    cols[4].markdown("**Duration**")
-    cols[5].markdown("") # Action
-    cols[6].markdown("") # Note
-    cols[7].markdown("") # Del
+    cols[1].markdown("**Date**")
+    cols[2].markdown("**Task Name**")
+    cols[3].markdown("**Category**")
+    cols[4].markdown("**Status**")
+    cols[5].markdown("**Duration**")
+    cols[6].markdown("") # Action
+    cols[7].markdown("") # Note
+    cols[8].markdown("") # Del
 
     # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
-            cols = st.columns([0.5, 3, 2, 1.5, 1.5, 0.5, 0.5, 0.5])
+            cols = st.columns([0.5, 1.2, 2.5, 1.8, 1.3, 1.2, 0.5, 0.5, 0.5])
             
             # Index
             cols[0].text(f"{idx + 1}")
             
+            # Date
+            cols[1].text(task.get('created_date', '-'))
+            
             # Name
-            cols[1].text(task.get('name', ''))
+            cols[2].text(task.get('name', ''))
             
             # Category
-            cols[2].text(task.get('category', ''))
+            cols[3].text(task.get('category', ''))
             
             # Status
             is_running = (idx == st.session_state.active_task_idx)
             status_color = "green" if is_running else "grey"
-            cols[3].markdown(f":{status_color}[{task.get('status', 'Pending')}]")
+            cols[4].markdown(f":{status_color}[{task.get('status', 'Pending')}]")
             
             # Duration Calculation
             try:
@@ -404,18 +409,18 @@ else:
                 start_t = st.session_state.start_time or time.time()
                 current_total += (time.time() - start_t)
             
-            cols[4].code(format_time(current_total))
+            cols[5].code(format_time(current_total))
             
             # Action Button (Icon based)
             btn_label = "⏹️" if is_running else "▶️"
             btn_type = "primary" if is_running else "secondary"
-            cols[5].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+            cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
             
             # Notes Button
-            cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+            cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
             
             # Delete Button
-            if cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+            if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                 pass # The click triggers the dialog logic via the callback
             
             # Notes Area (Conditional)
