@@ -6,7 +6,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # Page configuration
-st.set_page_config(page_title="Time Tracker", page_icon="⏱️", layout="wide")
+st.set_page_config(page_title="Tasks Monitor", page_icon="⏱️", layout="wide")
 
 # Custom CSS for premium look
 st.markdown("""
@@ -294,7 +294,7 @@ def toggle_timer(index):
 
 
 # Header
-st.title("⏱️ AG Time Tracker (GSpread Edition)")
+st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
 # Input Section
