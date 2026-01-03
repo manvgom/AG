@@ -38,9 +38,30 @@ if not st.session_state.authenticated:
         
     st.stop() # Block app execution
 
-# Sidebar Logout
+# Sidebar Logout & Settings
 with st.sidebar:
-    st.button("🔒 Logout", on_click=logout)
+    if st.button("🔒 Logout", key="logout_btn"):
+        logout()
+    
+    st.markdown("---")
+    
+    # Category Management
+    load_categories() # Ensure loaded
+    with st.expander("⚙️ Manage Categories"):
+        new_cat = st.text_input("New Category", placeholder="Name...", key="sidebar_new_cat")
+        if st.button("Add Category"):
+            if new_cat:
+                add_category(new_cat)
+                st.rerun()
+        
+        st.markdown("##### Current List:")
+        for cat in st.session_state.categories_list:
+            c1, c2 = st.columns([4, 1])
+            c1.text(cat)
+            if c2.button("❌", key=f"rm_cat_{cat}"):
+                remove_category(cat)
+                st.rerun()
+
 # ----------------------
 
 # Custom CSS for premium look
@@ -57,6 +78,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+
 # Constants
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -65,7 +87,7 @@ SCOPES = [
 # Added start_epoch for persistence, formatted_time for readability
 REQUIRED_COLUMNS = ['id', 'name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date', 'status']
 
-CATEGORIES = [
+DEFAULT_CATEGORIES = [
     "Gestión de la demanda",
     "Gestión de la planificación",
     "Otros"
@@ -139,6 +161,98 @@ def parse_time_str(time_str):
     except:
         pass
     return 0.0
+
+def load_categories():
+    """Load categories from 'Categories' worksheet OR initialize with defaults."""
+    if 'categories_list' not in st.session_state:
+        # Try loading from sheet
+        try:
+            gc = get_gc()
+            secrets = find_credentials(st.secrets)
+            url = secrets.get("spreadsheet") if secrets else None
+            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+            
+            if url:
+                sh = gc.open_by_url(url)
+                try:
+                    ws_cat = sh.worksheet("Categories")
+                    vals = ws_cat.col_values(1) # List of categories
+                    if not vals:
+                         # Empty sheet -> Populate defaults
+                         ws_cat.append_row(["Category Name"]) # Header (optional, usually I just list raw strings)
+                         # Actually for col_values it grabs everything.
+                         # Let's say Row 1 is NOT header to keep it simple, or Row 1 Is header.
+                         # Plan: Row 1 is Header 'Category'.
+                         ws_cat.clear()
+                         ws_cat.append_row(["Category"])
+                         for c in DEFAULT_CATEGORIES:
+                             ws_cat.append_row([c])
+                         st.session_state.categories_list = DEFAULT_CATEGORIES
+                    else:
+                        # vals[0] might be 'Category'
+                        if vals and vals[0] == "Category":
+                            loaded = vals[1:]
+                        else:
+                            loaded = vals
+                        
+                        # Filter empty
+                        loaded = [x for x in loaded if x.strip()]
+                        
+                        if not loaded:
+                            st.session_state.categories_list = DEFAULT_CATEGORIES
+                        else:
+                            st.session_state.categories_list = loaded
+                except gspread.WorksheetNotFound:
+                    # Create it
+                    ws_cat = sh.add_worksheet(title="Categories", rows=100, cols=1)
+                    ws_cat.append_row(["Category"])
+                    for c in DEFAULT_CATEGORIES:
+                        ws_cat.append_row([c])
+                    st.session_state.categories_list = DEFAULT_CATEGORIES
+            else:
+                st.session_state.categories_list = DEFAULT_CATEGORIES
+        except:
+            st.session_state.categories_list = DEFAULT_CATEGORIES
+
+def add_category(new_cat_name):
+    if new_cat_name and new_cat_name not in st.session_state.categories_list:
+        st.session_state.categories_list.append(new_cat_name)
+        # Persist
+        try:
+            gc = get_gc()
+            secrets = find_credentials(st.secrets)
+            url = secrets.get("spreadsheet") if secrets else None
+            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+            if url:
+                sh = gc.open_by_url(url)
+                ws = sh.worksheet("Categories")
+                ws.append_row([new_cat_name])
+                st.toast(f"Category '{new_cat_name}' added!", icon="✅")
+        except:
+             pass
+
+def remove_category(cat_name):
+    if cat_name in st.session_state.categories_list:
+        st.session_state.categories_list.remove(cat_name)
+        # Persist (Overwrite list)
+        try:
+            gc = get_gc()
+            secrets = find_credentials(st.secrets)
+            url = secrets.get("spreadsheet") if secrets else None
+            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+            if url:
+                sh = gc.open_by_url(url)
+                ws = sh.worksheet("Categories")
+                ws.clear()
+                ws.append_row(["Category"])
+                # Bulk update
+                # Transforming list to list of lists [[cat1], [cat2]]
+                rows = [[c] for c in st.session_state.categories_list]
+                if rows:
+                    ws.update(f"A2:A{len(rows)+1}", rows)
+                st.toast(f"Category '{cat_name}' removed!", icon="🗑️")
+        except Exception as e:
+            st.warning(f"Error removing category: {e}")
 
 def load_tasks():
     try:
@@ -389,11 +503,12 @@ def edit_task_dialog(index):
     
     # Category Selectbox
     current_cat = task.get('category', 'Otros')
+    cat_list = st.session_state.get('categories_list', DEFAULT_CATEGORIES)
     try:
-        cat_idx = CATEGORIES.index(current_cat)
+        cat_idx = cat_list.index(current_cat)
     except:
         cat_idx = 0
-    new_cat = st.selectbox("Category", CATEGORIES, index=cat_idx)
+    new_cat = st.selectbox("Category", cat_list, index=cat_idx)
     
     col1, col2 = st.columns(2)
     if col1.button("Cancel", use_container_width=True):
@@ -505,7 +620,7 @@ with tab_tracker:
     with col1:
         st.text_input("Description", key="new_task_input", placeholder="Enter task description...")
     with col2:
-        st.selectbox("Category", CATEGORIES, key="new_category_input")
+        st.selectbox("Category", st.session_state.get('categories_list', DEFAULT_CATEGORIES), key="new_category_input")
     with col3:
         st.button("Add", on_click=add_task, use_container_width=True)
 
@@ -515,7 +630,7 @@ with tab_tracker:
         with col_f1:
             search_query = st.text_input("Search (ID or Description)", placeholder="Type to search...").lower()
         with col_f2:
-            filter_categories = st.multiselect("Filter by Category", CATEGORIES)
+            filter_categories = st.multiselect("Filter by Category", st.session_state.get('categories_list', DEFAULT_CATEGORIES))
         with col_f3:
             filter_date = st.date_input("Filter by Date Range", value=[], help="Select a range")
 
