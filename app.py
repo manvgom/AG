@@ -196,9 +196,11 @@ def save_tasks():
             
             row = [
                 task.get('name', ''),
-                format_time(t_sec), # Human readable column
+                task.get('category', ''),
+                format_time(t_sec), 
                 task.get('status', 'Pending'),
-                task.get('start_epoch', 0.0) 
+                task.get('start_epoch', 0.0),
+                task.get('notes', '')
             ]
             values.append(row)
             
