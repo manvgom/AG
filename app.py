@@ -392,8 +392,10 @@ def update_notes():
             st.session_state.tasks[idx]['notes'] = st.session_state[key]
             save_tasks()
 
-def log_session(task_name, category, elapsed_seconds, start_epoch, end_epoch):
-    """Appends a new row to the 'Logs' worksheet."""
+def log_session(task_id, task_name, category, elapsed_seconds, start_epoch, end_epoch):
+    """Appends a new row to the 'Logs' worksheet with the format:
+       ID, Descripción, Categoría, Fecha Inicio, Fecha Fin, Tiempo
+    """
     try:
         if elapsed_seconds < 1: return # Ignore accidental clicks
         
@@ -410,43 +412,39 @@ def log_session(task_name, category, elapsed_seconds, start_epoch, end_epoch):
         try:
             ws_logs = sh.worksheet("Logs")
         except:
-            ws_logs = sh.add_worksheet(title="Logs", rows=1000, cols=8)
-            # Headers with detailed info
+            ws_logs = sh.add_worksheet(title="Logs", rows=1000, cols=6)
+            # New Headers
             ws_logs.append_row([
-                "Task Name", 
-                "Category", 
-                "Start Date", 
-                "End Date", 
-                "Start Time", 
-                "End Time", 
-                "Duration (s)", 
-                "Duration (Formatted)"
+                "ID", 
+                "Descripción", 
+                "Categoría", 
+                "Fecha Inicio", 
+                "Fecha Fin", 
+                "Tiempo"
             ])
             
-        # Format Timestamps
+        # Format Timestamps: DD/MM/AAAA HH:MM:SS
         start_dt = datetime.fromtimestamp(start_epoch)
         end_dt = datetime.fromtimestamp(end_epoch)
         
-        start_date_str = start_dt.strftime("%d/%m/%Y")
-        end_date_str = end_dt.strftime("%d/%m/%Y")
-        start_time_str = start_dt.strftime("%H:%M:%S")
-        end_time_str = end_dt.strftime("%H:%M:%S")
+        start_str = start_dt.strftime("%d/%m/%Y %H:%M:%S")
+        end_str = end_dt.strftime("%d/%m/%Y %H:%M:%S")
+        
+        # Format Duration: HH:MM:SS
+        duration_str = format_time(elapsed_seconds)
         
         # Append log data
         ws_logs.append_row([
+            str(task_id),
             task_name,
             category,
-            start_date_str,
-            end_date_str,
-            start_time_str,
-            end_time_str,
-            elapsed_seconds,
-            format_time(elapsed_seconds)
+            start_str,
+            end_str,
+            duration_str
         ])
         
     except Exception as e:
-        print(f"Log Error: {e}") # Silent fail in UI but print to console
-        # st.warning(f"Could not log session: {e}")
+        print(f"Log Error: {e}")
 
 @st.dialog("⚠️ Delete Task")
 def delete_confirmation(index):
@@ -560,6 +558,7 @@ def toggle_timer(index):
         
         # Log session
         log_session(
+            st.session_state.tasks[prev_idx].get('id', ''),
             st.session_state.tasks[prev_idx].get('name', ''), 
             st.session_state.tasks[prev_idx].get('category', ''), 
             elapsed,
