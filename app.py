@@ -906,7 +906,12 @@ with tab_tracker:
                         r_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
                         # Category
-                        r_cols[0].text(task.get('category', ''))
+                        cat_name = task.get('category', '')
+                        cat_desc = st.session_state.get('categories_desc', {}).get(cat_name, "")
+                        if cat_desc:
+                             r_cols[0].markdown(f"{cat_name}<br><span style='color:grey; font-size:0.8em;'>{cat_desc}</span>", unsafe_allow_html=True)
+                        else:
+                             r_cols[0].text(cat_name)
                         # Date
                         r_cols[1].text(task.get('created_date', '-'))
                         
