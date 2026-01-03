@@ -619,8 +619,8 @@ def add_task():
     task_name = st.session_state.get("new_task_input", "").strip()
     task_category = st.session_state.get("new_category_input", "") 
     
-    if not task_id or not task_name or not task_category:
-        st.toast("⚠️ Please fill in all fields (ID, Description, Category)", icon="⚠️")
+    if not task_id or not task_name:
+        st.toast("⚠️ Please fill in ID and Description", icon="⚠️")
         return
 
     if task_name: # Redundant check but keeping logic structure
