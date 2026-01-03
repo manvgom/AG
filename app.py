@@ -946,8 +946,6 @@ with tab_analytics:
 
 
 with tab_logs:
-    st.subheader("📜 Session History")
-    
     # Load Logs Button (to avoid slow load on every refresh)
     if st.button("🔄 Refresh Logs"):
         st.session_state.logs_data = None
