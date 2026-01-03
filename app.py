@@ -581,6 +581,34 @@ def toggle_timer(index):
 
 
 
+@st.dialog("⚙️ Manage Categories")
+def manage_categories_dialog():
+    st.write("Add or remove categories below.")
+    
+    new_cat = st.text_input("New Category Name", placeholder="e.g. Design, Meeting...", key="dialog_new_cat")
+    
+    if st.button("Add Category", type="primary", use_container_width=True):
+        if new_cat:
+            add_category(new_cat)
+            st.rerun()
+            
+    st.markdown("---")
+    st.markdown("##### Current Categories")
+    
+    if not st.session_state.categories_list:
+        st.info("No categories found.")
+    else:
+        for cat in st.session_state.categories_list:
+            c1, c2 = st.columns([4, 1], vertical_alignment="center")
+            c1.text(cat)
+            if c2.button("🗑️", key=f"rm_cat_dialog_{cat}"): # Changed key to avoid conflict if any phantom state
+                remove_category(cat)
+                st.rerun()
+    
+    if st.button("Close", key="close_cat_dialog"):
+        st.rerun()
+
+
 # Sidebar Logout & Settings
 with st.sidebar:
     if st.button("🔒 Logout", key="logout_btn"):
@@ -590,20 +618,9 @@ with st.sidebar:
     
     # Category Management
     load_categories() # Ensure loaded
-    with st.expander("⚙️ Manage Categories"):
-        new_cat = st.text_input("New Category", placeholder="Name...", key="sidebar_new_cat")
-        if st.button("Add Category"):
-            if new_cat:
-                add_category(new_cat)
-                st.rerun()
-        
-        st.markdown("##### Current List:")
-        for cat in st.session_state.categories_list:
-            c1, c2 = st.columns([4, 1])
-            c1.text(cat)
-            if c2.button("❌", key=f"rm_cat_{cat}"):
-                remove_category(cat)
-                st.rerun()
+    
+    if st.button("⚙️ Manage Categories", use_container_width=True):
+        manage_categories_dialog()
 
 # Header
 st.title("⏱️ Tasks Monitor")
