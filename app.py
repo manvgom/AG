@@ -662,7 +662,7 @@ with tab_tracker:
                         if r_cols[5].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True):
                             pass
 
-                        r_cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        r_cols[6].button("📄", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
                         
                         if r_cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                             pass
