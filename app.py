@@ -494,7 +494,7 @@ st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
 # Tabs
-tab_tracker, tab_analytics, tab_logs = st.tabs(["Tracker", "Analytics", "📜 Logs"])
+tab_tracker, tab_analytics, tab_logs = st.tabs(["⏱️ Tracker", "📊 Analytics", "📜 Logs"])
 
 with tab_tracker:
     # Input Section
