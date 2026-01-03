@@ -221,8 +221,11 @@ if 'start_time' not in st.session_state:
     st.session_state.start_time = None
 
 
+
 if 'confirm_delete_idx' not in st.session_state:
     st.session_state.confirm_delete_idx = None
+if 'active_note_idx' not in st.session_state:
+    st.session_state.active_note_idx = None
 
 def toggle_notes(index):
     # If closing, save manually to ensure latest change is captured
