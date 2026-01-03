@@ -758,7 +758,10 @@ with tab_tracker:
                 header_duration = format_time(group_total_seconds)
                 # Counter [X/Y]
                 progress_str = f"[{completed_subtasks}/{total_subtasks}]"
-                header_str = f"**{g_id if g_id else 'No ID'}** - {g_name}  (⏱️ {header_duration}) {progress_str}"
+                
+                # New Format: II2025029 - MES Fase IV - [00:01:25] - [0/2]
+                id_part = g_id if g_id else 'No ID'
+                header_str = f"**{id_part}** - {g_name} - [{header_duration}] - {progress_str}"
                 
                 if running_in_group:
                     header_str = "🟢 " + header_str
