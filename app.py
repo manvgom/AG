@@ -143,9 +143,11 @@ def load_tasks():
             
             clean_row = {
                 'name': str(row.get('name', '')),
+                'category': str(row.get('category', '')),
                 'total_seconds': total_sec,
                 'status': status,
-                'start_epoch': start_ep
+                'start_epoch': start_ep,
+                'notes': str(row.get('notes', ''))
             }
             validated_data.append(clean_row)
         
