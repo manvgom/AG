@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+import altair as alt
 
 # Page configuration
 st.set_page_config(page_title="Tasks Monitor", page_icon="⏱️", layout="wide")
@@ -404,152 +405,199 @@ def toggle_timer(index):
 st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
-# Input Section
-# 4 columns: ID | Description | Category | Add
-col0, col1, col2, col3 = st.columns([1, 3, 2, 1], vertical_alignment="bottom")
-with col0:
-    st.text_input("ID", key="new_task_id", placeholder="ID")
-with col1:
-    st.text_input("Description", key="new_task_input", placeholder="Enter task description...")
-with col2:
-    st.selectbox("Category", CATEGORIES, key="new_category_input")
-with col3:
-    st.button("Add", on_click=add_task, use_container_width=True)
+# Tabs
+tab_tracker, tab_analytics = st.tabs(["Tracker", "Analytics"])
 
-st.markdown("### My Tasks")
+with tab_tracker:
+    # Input Section
+    # 4 columns: ID | Description | Category | Add
+    col0, col1, col2, col3 = st.columns([1, 3, 2, 1], vertical_alignment="bottom")
+    with col0:
+        st.text_input("ID", key="new_task_id", placeholder="ID")
+    with col1:
+        st.text_input("Description", key="new_task_input", placeholder="Enter task description...")
+    with col2:
+        st.selectbox("Category", CATEGORIES, key="new_category_input")
+    with col3:
+        st.button("Add", on_click=add_task, use_container_width=True)
 
-# Filters
-with st.expander("🔎 Filters", expanded=False):
-    col_f1, col_f2, col_f3 = st.columns([2, 1.5, 1.5])
-    with col_f1:
-        search_query = st.text_input("Search (ID or Description)", placeholder="Type to search...").lower()
-    with col_f2:
-        filter_categories = st.multiselect("Filter by Category", CATEGORIES)
-    with col_f3:
-        filter_date = st.date_input("Filter by Date", value=None)
+    st.markdown("### My Tasks")
 
-# Task List Logic
-if not st.session_state.tasks:
-    st.info("No tasks found. Add one to start tracking!")
-else:
-    # 1. Filter Logic
-    filtered_tasks = []
-    for i, t in enumerate(st.session_state.tasks):
-        # Match Search
-        match_search = True
-        if search_query:
-            id_match = search_query in str(t.get('id', '')).lower()
-            desc_match = search_query in str(t.get('name', '')).lower()
-            match_search = id_match or desc_match
-        
-        # Match Category
-        match_cat = True
-        if filter_categories:
-            match_cat = t.get('category') in filter_categories
-        
-        # Match Date
-        match_date = True
-        if filter_date:
-            # Task date is "DD/MM/YYYY". Input is datetime.date (YYYY-MM-DD).
-            target_str = filter_date.strftime("%d/%m/%Y")
-            task_date = t.get('created_date', '')
-            if task_date != target_str:
-                match_date = False
-            
-        if match_search and match_cat and match_date:
-            filtered_tasks.append((i, t))
+    # Filters
+    with st.expander("🔎 Filters", expanded=False):
+        col_f1, col_f2, col_f3 = st.columns([2, 1.5, 1.5])
+        with col_f1:
+            search_query = st.text_input("Search (ID or Description)", placeholder="Type to search...").lower()
+        with col_f2:
+            filter_categories = st.multiselect("Filter by Category", CATEGORIES)
+        with col_f3:
+            filter_date = st.date_input("Filter by Date", value=None)
 
-    if not filtered_tasks:
-        st.warning("No tasks match your filters.")
+    # Task List Logic
+    if not st.session_state.tasks:
+        st.info("No tasks found. Add one to start tracking!")
     else:
-        # Header row
-        # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
-        # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
-        cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
-        cols[0].markdown("**#**")
-        cols[1].markdown("**ID**")
-        cols[2].markdown("**Description**")
-        cols[3].markdown("**Category**")
-        cols[4].markdown("**Start Date**")
-        cols[5].markdown("**Duration**")
-        cols[6].markdown("") # Action
-        cols[7].markdown("") # Note
-        cols[8].markdown("") # Del
-
-        # Loop to render rows (using filtered list)
-        for idx, task in filtered_tasks:
-            with st.container():
-                cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
-                
-                # Index
-                cols[0].text(f"{idx + 1}")
-                
-                # ID
-                cols[1].text(task.get('id', ''))
-
-                # Name (Description)
-                cols[2].text(task.get('name', ''))
-                
-                # Category
-                cols[3].text(task.get('category', ''))
-
-                # Date
-                cols[4].text(task.get('created_date', '-'))
-                
-                # Status Column REMOVED
-                is_running = (idx == st.session_state.active_task_idx)
-                
-                # Duration Calculation
-                try:
-                    raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
-                    current_total = float(raw_val)
-                except:
-                    current_total = 0.0
-                
-                # If running, add ONLY the elapsed time since start (don't mutate session state here)
-                if is_running:
-                    # Use stored start_time for smooth UI updates
-                    start_t = st.session_state.start_time or time.time()
-                    current_total += (time.time() - start_t)
-                
-                # Render Duration
-                # Improvement: Use markdown for color/style
-                dur_str = format_time(current_total)
-                if is_running:
-                    # Green and bold if running
-                    cols[5].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
-                else:
-                    # Standard monospace
-                    cols[5].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
-                
-                # Action Button (Icon based)
-                btn_label = "⏹️" if is_running else "▶️"
-                btn_type = "primary" if is_running else "secondary"
-                cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
-                
-                # Notes Button
-                cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
-                
-                # Delete Button
-                if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
-                    pass # The click triggers the dialog logic via the callback
-                
-                # Notes Area (Conditional)
-                if st.session_state.active_note_idx == idx:
-                    st.markdown(f"**Notes for: {task.get('name', '')}**")
-                    st.text_area(
-                        "Notes", 
-                        value=task.get('notes', ''), 
-                        key=f"note_content_{idx}",
-                        on_change=update_notes,
-                        label_visibility="collapsed",
-                        placeholder="Write details here..."
-                    )
+        # 1. Filter Logic
+        filtered_tasks = []
+        for i, t in enumerate(st.session_state.tasks):
+            # Match Search
+            match_search = True
+            if search_query:
+                id_match = search_query in str(t.get('id', '')).lower()
+                desc_match = search_query in str(t.get('name', '')).lower()
+                match_search = id_match or desc_match
             
-    st.markdown("---")
+            # Match Category
+            match_cat = True
+            if filter_categories:
+                match_cat = t.get('category') in filter_categories
+            
+            # Match Date
+            match_date = True
+            if filter_date:
+                # Task date is "DD/MM/YYYY". Input is datetime.date (YYYY-MM-DD).
+                target_str = filter_date.strftime("%d/%m/%Y")
+                task_date = t.get('created_date', '')
+                if task_date != target_str:
+                    match_date = False
+                
+            if match_search and match_cat and match_date:
+                filtered_tasks.append((i, t))
 
-    # Auto-refresh if timer is running
-    if st.session_state.active_task_idx is not None:
-        time.sleep(1)
-        st.rerun()
+        if not filtered_tasks:
+            st.warning("No tasks match your filters.")
+        else:
+            # Header row
+            # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
+            # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
+            cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
+            cols[0].markdown("**#**")
+            cols[1].markdown("**ID**")
+            cols[2].markdown("**Description**")
+            cols[3].markdown("**Category**")
+            cols[4].markdown("**Start Date**")
+            cols[5].markdown("**Duration**")
+            cols[6].markdown("") # Action
+            cols[7].markdown("") # Note
+            cols[8].markdown("") # Del
+
+            # Loop to render rows (using filtered list)
+            for idx, task in filtered_tasks:
+                with st.container():
+                    cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
+                    
+                    # Index
+                    cols[0].text(f"{idx + 1}")
+                    
+                    # ID
+                    cols[1].text(task.get('id', ''))
+
+                    # Name (Description)
+                    cols[2].text(task.get('name', ''))
+                    
+                    # Category
+                    cols[3].text(task.get('category', ''))
+
+                    # Date
+                    cols[4].text(task.get('created_date', '-'))
+                    
+                    # Status Column REMOVED
+                    is_running = (idx == st.session_state.active_task_idx)
+                    
+                    # Duration Calculation
+                    try:
+                        raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                        current_total = float(raw_val)
+                    except:
+                        current_total = 0.0
+                    
+                    # If running, add ONLY the elapsed time since start (don't mutate session state here)
+                    if is_running:
+                        # Use stored start_time for smooth UI updates
+                        start_t = st.session_state.start_time or time.time()
+                        current_total += (time.time() - start_t)
+                    
+                    # Render Duration
+                    # Improvement: Use markdown for color/style
+                    dur_str = format_time(current_total)
+                    if is_running:
+                        # Green and bold if running
+                        cols[5].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                    else:
+                        # Standard monospace
+                        cols[5].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
+                    
+                    # Action Button (Icon based)
+                    btn_label = "⏹️" if is_running else "▶️"
+                    btn_type = "primary" if is_running else "secondary"
+                    cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+                    
+                    # Notes Button
+                    cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                    
+                    # Delete Button
+                    if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                        pass # The click triggers the dialog logic via the callback
+                    
+                    # Notes Area (Conditional)
+                    if st.session_state.active_note_idx == idx:
+                        st.markdown(f"**Notes for: {task.get('name', '')}**")
+                        st.text_area(
+                            "Notes", 
+                            value=task.get('notes', ''), 
+                            key=f"note_content_{idx}",
+                            on_change=update_notes,
+                            label_visibility="collapsed",
+                            placeholder="Write details here..."
+                        )
+                
+        st.markdown("---")
+
+with tab_analytics:
+    st.header("📊 Task Analytics")
+    if not st.session_state.tasks:
+        st.info("No data available yet.")
+    else:
+        # Prepare Data
+        df = pd.DataFrame(st.session_state.tasks)
+        
+        # Ensure total_seconds is numeric
+        df['total_seconds'] = pd.to_numeric(df['total_seconds'], errors='coerce').fillna(0)
+        # Convert to hours for charting
+        df['Hours'] = df['total_seconds'] / 3600.0
+        
+        col_c1, col_c2 = st.columns(2)
+        
+        with col_c1:
+            st.subheader("Time by Category")
+            # Aggregate for Category
+            df_cat = df.groupby('category')['Hours'].sum().reset_index()
+            # Sort descending
+            df_cat = df_cat.sort_values(by="Hours", ascending=False)
+            
+            # Altair Donut Chart
+            base = alt.Chart(df_cat).encode(theta=alt.Theta("Hours", stack=True))
+            pie = base.mark_arc(outerRadius=120).encode(
+                color=alt.Color("category"),
+                order=alt.Order("Hours", sort="descending"),
+                tooltip=["category", alt.Tooltip("Hours", format=".2f")]
+            )
+            text = base.mark_text(radius=140).encode(
+                text=alt.Text("Hours", format=".1f"),
+                order=alt.Order("Hours", sort="descending"),
+                color=alt.value("black")  
+            )
+            st.altair_chart(pie + text, use_container_width=True)
+
+        with col_c2:
+            st.subheader("Time by Task ID")
+            # Aggregate by ID (or name if ID is missing)
+            df['DisplayID'] = df['id'].astype(str).where(df['id'].astype(str) != "", df['name'])
+            df_id = df.groupby('DisplayID')['Hours'].sum().sort_values(ascending=False)
+            st.bar_chart(df_id)
+
+# Auto-refresh if timer is running
+if st.session_state.active_task_idx is not None:
+    time.sleep(1)
+    st.rerun()
 
