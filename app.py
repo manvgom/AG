@@ -9,6 +9,40 @@ import altair as alt
 # Page configuration
 st.set_page_config(page_title="Tasks Monitor", page_icon="⏱️", layout="wide")
 
+# --- AUTHENTICATION ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+def check_login():
+    if st.session_state.get("auth_input", "") == st.secrets.get("password"):
+        st.session_state.authenticated = True
+    else:
+        st.session_state.auth_error = "Incorrect password ❌"
+
+def logout():
+    st.session_state.authenticated = False
+    st.rerun()
+
+if not st.session_state.authenticated:
+    # Check if password is configured
+    if "password" not in st.secrets:
+        st.warning("⚠️ Authentication is enabled but no password is set in `.streamlit/secrets.toml`. Please add `password = 'your_password'`.")
+        st.stop()
+        
+    st.title("🔐 Access Required")
+    st.text_input("Enter Password", type="password", key="auth_input", on_change=check_login)
+    
+    if "auth_error" in st.session_state:
+        st.error(st.session_state.auth_error)
+        del st.session_state.auth_error
+        
+    st.stop() # Block app execution
+
+# Sidebar Logout
+with st.sidebar:
+    st.button("🔒 Logout", on_click=logout)
+# ----------------------
+
 # Custom CSS for premium look
 st.markdown("""
     <style>
