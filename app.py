@@ -346,16 +346,13 @@ st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
 # Input Section
-col1, col2, col3 = st.columns([3, 2, 1])
+col1, col2, col3 = st.columns([3, 2, 1], vertical_alignment="bottom")
 with col1:
-    st.text_input("New Task Name", key="new_task_input", placeholder="Enter task description...")
+    st.text_input("Task Name", key="new_task_input", placeholder="Enter task description...")
 with col2:
     st.text_input("Category", key="new_category_input", placeholder="Project/Type")
 with col3:
-    # Use spaces or markdown to push button down to align with inputs
-    st.markdown("##") 
-    st.markdown("<div style='margin-top: -5px;'></div>", unsafe_allow_html=True) # Fine tuning alignment
-    st.button("Add Task", on_click=add_task, use_container_width=True)
+    st.button("Add", on_click=add_task, use_container_width=True)
 
 st.markdown("### My Tasks")
 
