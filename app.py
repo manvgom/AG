@@ -499,89 +499,104 @@ with tab_tracker:
         if not filtered_tasks:
             st.warning("No tasks match your filters.")
         else:
-            # Header row
-            # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
-            # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
-            cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
-            cols[0].markdown("**#**")
-            cols[1].markdown("**ID**")
-            cols[2].markdown("**Description**")
-            cols[3].markdown("**Category**")
-            cols[4].markdown("**Start Date**")
-            cols[5].markdown("**Duration**")
-            cols[6].markdown("") # Action
-            cols[7].markdown("") # Note
-            cols[8].markdown("") # Del
-
-            # Loop to render rows (using filtered list)
+            # Group filtered tasks by (id, name) to avoid duplication
+            # groups: dict[key: tuple(id, name)] -> list[tuple(index, task)]
+            groups = {}
             for idx, task in filtered_tasks:
-                with st.container():
-                    cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
-                    
-                    # Index
-                    cols[0].text(f"{idx + 1}")
-                    
-                    # ID
-                    cols[1].text(task.get('id', ''))
-
-                    # Name (Description)
-                    cols[2].text(task.get('name', ''))
-                    
-                    # Category
-                    cols[3].text(task.get('category', ''))
-
-                    # Date
-                    cols[4].text(task.get('created_date', '-'))
-                    
-                    # Status Column REMOVED
-                    is_running = (idx == st.session_state.active_task_idx)
-                    
-                    # Duration Calculation
+                key = (task.get('id', '').strip(), task.get('name', '').strip())
+                if key not in groups:
+                    groups[key] = []
+                groups[key].append((idx, task))
+            
+            # Loop through groups
+            for (g_id, g_name), g_tasks in groups.items():
+                # Check if group is active or has special state
+                
+                # Calculate total group time for header
+                group_total_seconds = 0.0
+                for _, t in g_tasks:
                     try:
-                        raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
-                        current_total = float(raw_val)
+                        raw_val = str(t.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                        group_total_seconds += float(raw_val)
                     except:
-                        current_total = 0.0
+                        pass
                     
-                    # If running, add ONLY the elapsed time since start (don't mutate session state here)
-                    if is_running:
-                        # Use stored start_time for smooth UI updates
+                # Add running time to group total if any task in group is running
+                running_in_group = False
+                for i, _ in g_tasks:
+                    if i == st.session_state.active_task_idx:
                         start_t = st.session_state.start_time or time.time()
-                        current_total += (time.time() - start_t)
+                        group_total_seconds += (time.time() - start_t)
+                        running_in_group = True
+                
+                header_duration = format_time(group_total_seconds)
+                header_str = f"**{g_id if g_id else 'No ID'}** - {g_name}  (⏱️ {header_duration})"
+                if running_in_group:
+                    header_str = "🟢 " + header_str
+                
+                # Render Group Expander
+                # Default open if filtered or running
+                is_expanded = (len(groups) == 1) or running_in_group
+                
+                with st.expander(header_str, expanded=is_expanded):
+                    # Header row for the group content
+                    # Col widths: Category, Date, Duration, Action, Note, Del
+                    # Normalized relative to inner width
+                    # Allocating: Cat(3), Date(1.5), Dur(1.5), Act(0.8), Note(0.8), Del(0.8)
+                    h_cols = st.columns([3, 1.5, 1.5, 0.8, 0.8, 0.8], vertical_alignment="center")
+                    h_cols[0].markdown("**Category**")
+                    h_cols[1].markdown("**Date**")
+                    h_cols[2].markdown("**Duration**")
                     
-                    # Render Duration
-                    # Improvement: Use markdown for color/style
-                    dur_str = format_time(current_total)
-                    if is_running:
-                        # Green and bold if running
-                        cols[5].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
-                    else:
-                        # Standard monospace
-                        cols[5].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
-                    
-                    # Action Button (Icon based)
-                    btn_label = "⏹️" if is_running else "▶️"
-                    btn_type = "primary" if is_running else "secondary"
-                    cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
-                    
-                    # Notes Button
-                    cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
-                    
-                    # Delete Button
-                    if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
-                        pass # The click triggers the dialog logic via the callback
-                    
-                    # Notes Area (Conditional)
-                    if st.session_state.active_note_idx == idx:
-                        st.markdown(f"**Notes for: {task.get('name', '')}**")
-                        st.text_area(
-                            "Notes", 
-                            value=task.get('notes', ''), 
-                            key=f"note_content_{idx}",
-                            on_change=update_notes,
-                            label_visibility="collapsed",
-                            placeholder="Write details here..."
-                        )
+                    for idx, task in g_tasks:
+                        r_cols = st.columns([3, 1.5, 1.5, 0.8, 0.8, 0.8], vertical_alignment="center")
+                        
+                        # Category
+                        r_cols[0].text(task.get('category', ''))
+                        # Date
+                        r_cols[1].text(task.get('created_date', '-'))
+                        
+                        # Status/Timer Logic
+                        is_running = (idx == st.session_state.active_task_idx)
+                        
+                        # Duration Calculation
+                        try:
+                            raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                            current_total = float(raw_val)
+                        except:
+                            current_total = 0.0
+                        
+                        if is_running:
+                            start_t = st.session_state.start_time or time.time()
+                            current_total += (time.time() - start_t)
+                        
+                        dur_str = format_time(current_total)
+                        if is_running:
+                             r_cols[2].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                        else:
+                             r_cols[2].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
+                        
+                        # Buttons
+                        btn_label = "⏹️" if is_running else "▶️"
+                        btn_type = "primary" if is_running else "secondary"
+                        r_cols[3].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+                        
+                        r_cols[4].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        
+                        if r_cols[5].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                            pass
+                            
+                        # Notes Area
+                        if st.session_state.active_note_idx == idx:
+                            st.markdown(f"**Notes for: {task.get('category', '')}**")
+                            st.text_area(
+                                "Notes", 
+                                value=task.get('notes', ''), 
+                                key=f"note_content_{idx}",
+                                on_change=update_notes,
+                                label_visibility="collapsed",
+                                placeholder="Details..."
+                            )
                 
         st.markdown("---")
 
