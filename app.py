@@ -805,13 +805,12 @@ with tab_tracker:
                 
                 
                 # Header Row: Expander + Add Button
-                col_expander, col_header_btn = st.columns([0.94, 0.06])
+                # Adjusted ratio and alignment for better visuals
+                col_expander, col_header_btn = st.columns([0.92, 0.08], gap="small", vertical_alignment="center")
                 
                 with col_header_btn:
-                     st.write("") # Spacer for alignment
-                     st.write("") # Extra Spacer
-                     
-                     if st.button("➕", key=f"add_sibling_{g_id}_{g_name}", help="Add new category for this task"):
+                     # Button vertically centered by column setting
+                     if st.button("➕", key=f"add_sibling_{g_id}_{g_name}", help="Add new category for this task", use_container_width=True):
                          add_sibling_task_dialog(g_id, g_name)
 
                 with col_expander:
