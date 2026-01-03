@@ -947,160 +947,113 @@ with tab_analytics:
     if not st.session_state.tasks:
         st.info("No data available yet.")
     else:
-        # Prepare Data
-        df = pd.DataFrame(st.session_state.tasks)
-        
-        # Ensure total_seconds is numeric
-        df['total_seconds'] = pd.to_numeric(df['total_seconds'], errors='coerce').fillna(0)
-        # Convert to hours for charting
-        df['Hours'] = df['total_seconds'] / 3600.0
 
-        # Date Filtering Logic
-        # Convert 'created_date' (DD/MM/YYYY) to datetime
-        df['date_dt'] = pd.to_datetime(df['created_date'], format="%d/%m/%Y", errors='coerce')
+
+
+
+
+
+with tab_analytics:
+    # Ensure data is loaded
+    ensure_logs_loaded()
+    
+    if "logs_data" not in st.session_state or st.session_state.logs_data.empty:
+         st.info("No logs data available yet. Start working on tasks to see analytics!")
+    else:
+        # Process Data from LOGS (Not Tasks)
+        df_log = st.session_state.logs_data.copy()
         
+        # Schema: ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
+        # Convert 'Tiempo' (Seconds) to float
+        df_log['Seconds'] = pd.to_numeric(df_log['Tiempo'], errors='coerce').fillna(0)
+        df_log['Hours'] = df_log['Seconds'] / 3600.0
+        
+        # Convert Dates
+        # Format in Sheet is usually DD/MM/YYYY or from epoch.
+        # Actually in log_session we write "Date" column manually with DD/MM/YYYY or similar?
+        # Wait, the new schema has "Fecha Inicio" which is likely a Timestamp or Date.
+        # Let's check 'log_session'. It uses 'today_str' for Date, and start/end epoch.
+        # Ah, 'log_session' writes: [id, name, cat_str, start_dt, end_dt, elapsed]
+        # start_dt is datetime.fromtimestamp(start_epoch).strftime("%d/%m/%Y %H:%M:%S")
+        
+        # Parse 'Fecha Inicio' to datetime
+        df_log['StartDT'] = pd.to_datetime(df_log['Fecha Inicio'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+        # Fallback if format differs?
+        
+        df_log['Date'] = df_log['StartDT'].dt.date
+        df_log['Hour'] = df_log['StartDT'].dt.hour
+        
+        # Filter Logic
         col_ctrl, _ = st.columns([1, 2])
         with col_ctrl:
-            date_range = st.date_input("Filter Analytics by Date Range", value=[])
-        
+            date_range = st.date_input("Filter Analytics by Date Range", value=[], key="video_analytics_range")
+            
         if date_range:
             if len(date_range) == 2:
-                start_d, end_d = date_range
-                # Filter strictly by range (inclusive)
-                mask = (df['date_dt'].dt.date >= start_d) & (df['date_dt'].dt.date <= end_d)
-                df = df[mask]
-                st.caption(f"Showing data from {start_d.strftime('%d/%m/%Y')} to {end_d.strftime('%d/%m/%Y')}")
+                s, e = date_range
+                df_log = df_log[(df_log['Date'] >= s) & (df_log['Date'] <= e)]
             elif len(date_range) == 1:
-                # Single date selected
-                target_d = date_range[0]
-                mask = (df['date_dt'].dt.date == target_d)
-                df = df[mask]
-                st.caption(f"Showing data for {target_d.strftime('%d/%m/%Y')}")
-
-        if df.empty:
-            st.warning("No data found for the selected date range.")
+                df_log = df_log[df_log['Date'] == date_range[0]]
+                
+        if df_log.empty:
+            st.warning("No data for selected period.")
         else:
-            # Chart 1: Time by Category
-            st.subheader("Time by Category")
-            # Aggregate for Category (Sum both Hours and Seconds for formatting)
-            df_cat = df.groupby('category').agg({'total_seconds': 'sum'}).reset_index()
-            df_cat['Hours'] = df_cat['total_seconds'] / 3600.0
-            df_cat['Formatted Time'] = df_cat['total_seconds'].apply(format_time)
+            # -------------------------------------------------------
+            # Row 1: Daily Activity Trend (Bar Chart)
+            # -------------------------------------------------------
+            st.subheader("📅 Daily Activity Trend")
+            daily_agg = df_log.groupby('Date')['Hours'].sum().reset_index()
+            daily_agg['DateStr'] = daily_agg['Date'].astype(str)
             
-            # Sort descending
-            df_cat = df_cat.sort_values(by="Hours", ascending=False)
+            chart_daily = alt.Chart(daily_agg).mark_bar().encode(
+                x=alt.X('DateStr', title='Date'),
+                y=alt.Y('Hours', title='Total Hours'),
+                tooltip=['DateStr', alt.Tooltip('Hours', format='.2f')],
+                color=alt.value("#4C78A8")
+            ).properties(height=300)
             
-            # Altair Donut Chart
-            base = alt.Chart(df_cat).encode(theta=alt.Theta("Hours", stack=True))
+            st.altair_chart(chart_daily, use_container_width=True)
+            st.markdown("---")
+
+            # -------------------------------------------------------
+            # Row 2: Hourly Productivity Heatmap
+            # -------------------------------------------------------
+            st.subheader("🔥 Peak Productivity Hours")
+            # Group by Hour (0-23)
+            hourly_agg = df_log.groupby('Hour')['Hours'].sum().reset_index()
+            
+            chart_hourly = alt.Chart(hourly_agg).mark_bar(color="#ff9f43").encode(
+                x=alt.X('Hour', title='Hour of Day (0-23)', scale=alt.Scale(domain=[0, 23])),
+                y=alt.Y('Hours', title='Total Hours Worked'),
+                tooltip=['Hour', alt.Tooltip('Hours', format='.2f')]
+            ).properties(height=250)
+            
+            st.altair_chart(chart_hourly, use_container_width=True)
+            st.markdown("---")
+
+            # -------------------------------------------------------
+            # Row 3: Category Distribution
+            # -------------------------------------------------------
+            st.subheader("📊 Time Distribution by Category")
+            cat_agg = df_log.groupby('Categoría')['Hours'].sum().reset_index()
+            cat_agg = cat_agg.sort_values('Hours', ascending=False)
+            
+            base = alt.Chart(cat_agg).encode(theta=alt.Theta("Hours", stack=True))
             pie = base.mark_arc(outerRadius=120).encode(
-                color=alt.Color("category"),
+                color=alt.Color("Categoría"),
                 order=alt.Order("Hours", sort="descending"),
-                tooltip=["category", "Formatted Time", alt.Tooltip("Hours", format=".2f")]
+                tooltip=["Categoría", alt.Tooltip("Hours", format='.2f')]
             )
             text = base.mark_text(radius=140).encode(
-                text=alt.Text("Formatted Time"),
+                text=alt.Text("Hours", format=".1f"),
                 order=alt.Order("Hours", sort="descending"),
-                color=alt.value("black")  
+                color=alt.value("white")  
             )
             st.altair_chart(pie + text, use_container_width=True)
 
-            st.markdown("---")
-
-            # Chart 2: Time by Task ID
-            st.subheader("Time by Task ID")
-            # Aggregate by ID (or name if ID is missing)
-            df['DisplayID'] = df['id'].astype(str).where(df['id'].astype(str) != "", df['name'])
-            
-            # Aggregate seconds first
-            df_id = df.groupby('DisplayID').agg({'total_seconds': 'sum'}).reset_index()
-            df_id['Hours'] = df_id['total_seconds'] / 3600.0
-            df_id['Formatted Time'] = df_id['total_seconds'].apply(format_time)
-            
-            # Sort for Bar Chart
-            df_id = df_id.sort_values(by="Hours", ascending=False)
-            
-            # Altair Bar Chart (Replacing st.bar_chart for better tooltip control)
-            bar_chart = alt.Chart(df_id).mark_bar().encode(
-                x=alt.X('Hours', title='Hours'),
-                y=alt.Y('DisplayID', sort='-x', title='Task ID'),
-                tooltip=['DisplayID', 'Formatted Time', alt.Tooltip('Hours', format='.2f')],
-                color=alt.value("#1f77b4") # Standard Blue
-            ).properties(
-                height=max(300, len(df_id) * 30) # Dynamic height based on number of bars
-            )
-            st.altair_chart(bar_chart, use_container_width=True)
-
-
-
-
-
 with tab_logs:
-    if "logs_data" not in st.session_state or st.session_state.logs_data is None:
-        # Load logic specific for logs
-        try:
-            gc = get_gc()
-            secrets = find_credentials(st.secrets)
-            url = secrets.get("spreadsheet") if secrets else None
-            # Fallback
-            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
-            
-            if url:
-                sh = gc.open_by_url(url)
-                try:
-                    ws_logs = sh.worksheet("Logs")
-                    data = ws_logs.get_all_values()
-                    
-                    # ---------------------------------------------------------
-                    # HEADER FIX / MIGRATION
-                    # Check if headers match new schema. If not (or empty), update them.
-                    # ---------------------------------------------------------
-                    NEW_HEADERS = ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
-                    need_header_update = False
-                    
-                    if not data:
-                        need_header_update = True
-                    else:
-                        current_headers = data[0]
-                        # Check first 3 columns as heuristic
-                        if len(current_headers) < 3 or current_headers[0] != "ID" or current_headers[1] != "Descripción":
-                            need_header_update = True
-                    
-                    if need_header_update:
-                        # Append or Overwrite headers at Row 1
-                        # If data exists but headers wrong, we just overwrite A1:F1. Old data might look weird but new data aligns.
-                        if not data:
-                            ws_logs.append_row(NEW_HEADERS)
-                        else:
-                            # Update existing headers
-                            ws_logs.update(range_name="A1:F1", values=[NEW_HEADERS])
-                        
-                        # Reload data after update
-                        data = ws_logs.get_all_values()
-                        st.toast("✅ Updated Logs Headers to new format.", icon="🛠️")
-
-                    if data:
-                        raw_headers = data[0]
-                        raw_rows = data[1:]
-                        
-                        # Filter out empty duplicate headers (common in GSheets)
-                        valid_indices = [i for i, h in enumerate(raw_headers) if h.strip()]
-                        
-                        if valid_indices:
-                            clean_headers = [raw_headers[i] for i in valid_indices]
-                            clean_rows = [[r[i] if i < len(r) else "" for i in valid_indices] for r in raw_rows]
-                            st.session_state.logs_data = pd.DataFrame(clean_rows, columns=clean_headers)
-                        else:
-                             st.session_state.logs_data = pd.DataFrame()
-                    else:
-                        st.session_state.logs_data = pd.DataFrame()
-                except gspread.WorksheetNotFound:
-                    st.session_state.logs_data = pd.DataFrame() # Empty
-                except Exception as e:
-                    st.error(f"Error loading logs: {e}")
-                    st.session_state.logs_data = pd.DataFrame()
-        except:
-            pass
-
+    ensure_logs_loaded()
+    
     if "logs_data" in st.session_state and isinstance(st.session_state.logs_data, pd.DataFrame):
         df_log = st.session_state.logs_data
         if not df_log.empty:
