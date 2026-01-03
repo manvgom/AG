@@ -250,7 +250,62 @@ def remove_category(cat_name):
         except Exception as e:
             st.warning(f"Error removing category: {e}")
 
+def ensure_logs_loaded():
+    """Ensure logs_data is loaded in session state."""
+    if "logs_data" not in st.session_state or st.session_state.logs_data is None:
+        try:
+            gc = get_gc()
+            secrets = find_credentials(st.secrets)
+            url = secrets.get("spreadsheet") if secrets else None
+            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+            
+            if url:
+                sh = gc.open_by_url(url)
+                try:
+                    ws_logs = sh.worksheet("Logs")
+                    data = ws_logs.get_all_values()
+                    
+                    # ---------------------------------------------------------
+                    # HEADER FIX / MIGRATION
+                    # ---------------------------------------------------------
+                    NEW_HEADERS = ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
+                    need_header_update = False
+                    
+                    if not data:
+                        need_header_update = True
+                    else:
+                        current_headers = data[0]
+                        if len(current_headers) < 3 or current_headers[0] != "ID" or current_headers[1] != "Descripción":
+                            need_header_update = True
+                    
+                    if need_header_update:
+                        if not data:
+                            ws_logs.append_row(NEW_HEADERS)
+                        else:
+                            ws_logs.update(range_name="A1:F1", values=[NEW_HEADERS])
+                        data = ws_logs.get_all_values()
+                        st.toast("✅ Updated Logs Headers to new format.", icon="🛠️")
 
+                    if data:
+                        raw_headers = data[0]
+                        raw_rows = data[1:]
+                        valid_indices = [i for i, h in enumerate(raw_headers) if h.strip()]
+                        
+                        if valid_indices:
+                            clean_headers = [raw_headers[i] for i in valid_indices]
+                            clean_rows = [[r[i] if i < len(r) else "" for i in valid_indices] for r in raw_rows]
+                            st.session_state.logs_data = pd.DataFrame(clean_rows, columns=clean_headers)
+                        else:
+                             st.session_state.logs_data = pd.DataFrame()
+                    else:
+                        st.session_state.logs_data = pd.DataFrame()
+                except gspread.WorksheetNotFound:
+                     st.session_state.logs_data = pd.DataFrame()
+            else:
+                 st.session_state.logs_data = pd.DataFrame()
+        except Exception as e:
+            st.warning(f"Error loading logs: {e}")
+            st.session_state.logs_data = pd.DataFrame()
 
 def load_tasks():
     try:
