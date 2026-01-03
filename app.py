@@ -963,12 +963,40 @@ with tab_logs:
                 try:
                     ws_logs = sh.worksheet("Logs")
                     data = ws_logs.get_all_values()
+                    
+                    # ---------------------------------------------------------
+                    # HEADER FIX / MIGRATION
+                    # Check if headers match new schema. If not (or empty), update them.
+                    # ---------------------------------------------------------
+                    NEW_HEADERS = ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
+                    need_header_update = False
+                    
+                    if not data:
+                        need_header_update = True
+                    else:
+                        current_headers = data[0]
+                        # Check first 3 columns as heuristic
+                        if len(current_headers) < 3 or current_headers[0] != "ID" or current_headers[1] != "Descripción":
+                            need_header_update = True
+                    
+                    if need_header_update:
+                        # Append or Overwrite headers at Row 1
+                        # If data exists but headers wrong, we just overwrite A1:F1. Old data might look weird but new data aligns.
+                        if not data:
+                            ws_logs.append_row(NEW_HEADERS)
+                        else:
+                            # Update existing headers
+                            ws_logs.update(range_name="A1:F1", values=[NEW_HEADERS])
+                        
+                        # Reload data after update
+                        data = ws_logs.get_all_values()
+                        st.toast("✅ Updated Logs Headers to new format.", icon="🛠️")
+
                     if data:
                         raw_headers = data[0]
                         raw_rows = data[1:]
                         
                         # Filter out empty duplicate headers (common in GSheets)
-                        # Keep only columns where header is not empty
                         valid_indices = [i for i, h in enumerate(raw_headers) if h.strip()]
                         
                         if valid_indices:
