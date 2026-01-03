@@ -248,7 +248,7 @@ def update_notes():
             st.session_state.tasks[idx]['notes'] = st.session_state[key]
             save_tasks()
 
-@st.experimental_dialog("⚠️ Delete Task")
+@st.dialog("⚠️ Delete Task")
 def delete_confirmation(index):
     st.write("Are you sure you want to delete this task?")
     st.write(f"**{st.session_state.tasks[index]['name']}**")
