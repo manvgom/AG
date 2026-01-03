@@ -464,7 +464,7 @@ with tab_tracker:
         with col_f2:
             filter_categories = st.multiselect("Filter by Category", CATEGORIES)
         with col_f3:
-            filter_date = st.date_input("Filter by Date", value=None)
+            filter_date = st.date_input("Filter by Date Range", value=[], help="Select a range")
 
     # Task List Logic
     if not st.session_state.tasks:
@@ -488,11 +488,26 @@ with tab_tracker:
             # Match Date
             match_date = True
             if filter_date:
-                # Task date is "DD/MM/YYYY". Input is datetime.date (YYYY-MM-DD).
-                target_str = filter_date.strftime("%d/%m/%Y")
-                task_date = t.get('created_date', '')
-                if task_date != target_str:
-                    match_date = False
+                try:
+                    task_dt = datetime.strptime(t.get('created_date', ''), "%d/%m/%Y").date()
+                except:
+                    task_dt = None
+                
+                # Careful: st.date_input with value=[] can return [] or partial tuple
+                # If user hasn't selected anything, filter_date might be empty list -> False
+                # If user selected one date -> tuple length 1
+                
+                if not task_dt:
+                     # If task has no date, exclude it if filter is active
+                     match_date = False 
+                else:
+                    if len(filter_date) == 1:
+                        if task_dt != filter_date[0]:
+                            match_date = False
+                    elif len(filter_date) == 2:
+                        start_d, end_d = filter_date
+                        if not (start_d <= task_dt <= end_d):
+                            match_date = False
                 
             if match_search and match_cat and match_date:
                 filtered_tasks.append((i, t))
