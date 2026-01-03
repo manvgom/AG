@@ -565,8 +565,33 @@ with tab_analytics:
         df['total_seconds'] = pd.to_numeric(df['total_seconds'], errors='coerce').fillna(0)
         # Convert to hours for charting
         df['Hours'] = df['total_seconds'] / 3600.0
+
+        # Date Filtering Logic
+        # Convert 'created_date' (DD/MM/YYYY) to datetime
+        df['date_dt'] = pd.to_datetime(df['created_date'], format="%d/%m/%Y", errors='coerce')
         
-        col_c1, col_c2 = st.columns(2)
+        col_ctrl, _ = st.columns([1, 2])
+        with col_ctrl:
+            date_range = st.date_input("Filter Analytics by Date Range", value=[])
+        
+        if date_range:
+            if len(date_range) == 2:
+                start_d, end_d = date_range
+                # Filter strictly by range (inclusive)
+                mask = (df['date_dt'].dt.date >= start_d) & (df['date_dt'].dt.date <= end_d)
+                df = df[mask]
+                st.caption(f"Showing data from {start_d.strftime('%d/%m/%Y')} to {end_d.strftime('%d/%m/%Y')}")
+            elif len(date_range) == 1:
+                # Single date selected
+                target_d = date_range[0]
+                mask = (df['date_dt'].dt.date == target_d)
+                df = df[mask]
+                st.caption(f"Showing data for {target_d.strftime('%d/%m/%Y')}")
+
+        if df.empty:
+            st.warning("No data found for the selected date range.")
+        else:
+            col_c1, col_c2 = st.columns(2)
         
         with col_c1:
             st.subheader("Time by Category")
