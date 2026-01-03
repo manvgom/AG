@@ -965,9 +965,19 @@ with tab_logs:
                     ws_logs = sh.worksheet("Logs")
                     data = ws_logs.get_all_values()
                     if data:
-                        headers = data[0]
-                        rows = data[1:]
-                        st.session_state.logs_data = pd.DataFrame(rows, columns=headers)
+                        raw_headers = data[0]
+                        raw_rows = data[1:]
+                        
+                        # Filter out empty duplicate headers (common in GSheets)
+                        # Keep only columns where header is not empty
+                        valid_indices = [i for i, h in enumerate(raw_headers) if h.strip()]
+                        
+                        if valid_indices:
+                            clean_headers = [raw_headers[i] for i in valid_indices]
+                            clean_rows = [[r[i] if i < len(r) else "" for i in valid_indices] for r in raw_rows]
+                            st.session_state.logs_data = pd.DataFrame(clean_rows, columns=clean_headers)
+                        else:
+                             st.session_state.logs_data = pd.DataFrame()
                     else:
                         st.session_state.logs_data = pd.DataFrame()
                 except gspread.WorksheetNotFound:
