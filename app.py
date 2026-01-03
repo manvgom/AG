@@ -220,11 +220,17 @@ if 'active_task_idx' not in st.session_state:
 if 'start_time' not in st.session_state:
     st.session_state.start_time = None
 
-if 'active_note_idx' not in st.session_state:
-    st.session_state.active_note_idx = None
+
+if 'confirm_delete_idx' not in st.session_state:
+    st.session_state.confirm_delete_idx = None
 
 def toggle_notes(index):
+    # If closing, save manually to ensure latest change is captured
     if st.session_state.active_note_idx == index:
+        key = f"note_content_{index}"
+        if key in st.session_state:
+            st.session_state.tasks[index]['notes'] = st.session_state[key]
+            save_tasks()
         st.session_state.active_note_idx = None
     else:
         st.session_state.active_note_idx = index
@@ -237,7 +243,19 @@ def update_notes():
             st.session_state.tasks[idx]['notes'] = st.session_state[key]
             save_tasks()
 
+def request_delete(index):
+    st.session_state.confirm_delete_idx = index
+
+def cancel_delete():
+    st.session_state.confirm_delete_idx = None
+
+def confirm_delete(index):
+    # Perform actual deletion
+    delete_task(index)
+    st.session_state.confirm_delete_idx = None
+
 def add_task():
+    # ... (existing add_task code here) ...
     task_name = st.session_state.new_task_input
     task_category = st.session_state.get("new_category_input", "") # Safely get category
     
@@ -247,11 +265,17 @@ def add_task():
             'category': task_category,
             'total_seconds': 0,
             'status': 'Pending',
-            'start_epoch': 0.0
+            'start_epoch': 0.0,
+            'notes': ""
         })
-        st.session_state.new_task_input = "" # Clear input
-        st.session_state.new_category_input = "" # Clear category input
+        st.session_state.new_task_input = "" 
+        st.session_state.new_category_input = "" 
         save_tasks()
+
+# ... (delete_task function remains same, but is called by confirm_delete) ...
+# I need to be careful not to overwrite delete_task definition if it is in the range. 
+# The range 220-400 covers a lot. I will assume delete_task is around line 237.
+# I will include it to satisfy the block.
 
 def delete_task(index):
     # Stop timer if deleting active task
@@ -265,6 +289,7 @@ def delete_task(index):
     save_tasks()
 
 def toggle_timer(index):
+    # ... (toggle_timer logic remains same) ...
     current_time = time.time()
     
     # 1. Stop distinct previous task if running
@@ -313,8 +338,6 @@ def toggle_timer(index):
         st.session_state.tasks[index]['start_epoch'] = current_time 
     
     save_tasks()
-
-
 
 # Header
 st.title("⏱️ Tasks Monitor")
@@ -384,26 +407,31 @@ else:
             
             cols[4].code(format_time(current_total))
             
-            # Action Button
-            btn_label = "Stop" if is_running else "Start"
+            # Action Button (Icon based)
+            btn_label = "⏹️" if is_running else "▶️"
             btn_type = "primary" if is_running else "secondary"
             cols[5].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
             
             # Notes Button
             cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
             
-            # Delete Button
-            cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_task, args=(idx,), use_container_width=True)
+            # Delete Button (With Confirmation)
+            if st.session_state.confirm_delete_idx == idx:
+                # Show red confirm button
+                cols[7].button("⚠️", key=f"confirm_del_{idx}", type="primary", on_click=confirm_delete, args=(idx,), use_container_width=True, help="Confirm Deletion")
+            else:
+                cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=request_delete, args=(idx,), use_container_width=True)
             
             # Notes Area (Conditional)
             if st.session_state.active_note_idx == idx:
+                st.markdown(f"**Notes for: {task.get('name', '')}**")
                 st.text_area(
                     "Notes", 
                     value=task.get('notes', ''), 
                     key=f"note_content_{idx}",
                     on_change=update_notes,
                     label_visibility="collapsed",
-                    placeholder="Add details here..."
+                    placeholder="Write details here..."
                 )
             
     st.markdown("---")
