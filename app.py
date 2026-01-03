@@ -28,7 +28,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 # Added start_epoch for persistence, formatted_time for readability
-REQUIRED_COLUMNS = ['name', 'category', 'formatted_time', 'status', 'start_epoch', 'notes']
+REQUIRED_COLUMNS = ['name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date']
 
 # Helper: Format seconds to HH:MM:SS
 def format_time(seconds):
@@ -333,6 +333,9 @@ def toggle_timer(index):
         # Status update removed
         st.session_state.tasks[index]['start_epoch'] = 0.0 
         
+        # LOG SESSION
+        log_session(task.get('name'), task.get('category'), elapsed)
+
         st.session_state.active_task_idx = None
         st.session_state.start_time = None
     else:
@@ -353,7 +356,8 @@ col1, col2, col3 = st.columns([3, 2, 1], vertical_alignment="bottom")
 with col1:
     st.text_input("Task Name", key="new_task_input", placeholder="Enter task description...")
 with col2:
-    st.text_input("Category", key="new_category_input", placeholder="Project/Type")
+    # Changed to Selectbox
+    st.selectbox("Category", CATEGORIES, key="new_category_input")
 with col3:
     st.button("Add", on_click=add_task, use_container_width=True)
 
