@@ -30,6 +30,12 @@ SCOPES = [
 # Added start_epoch for persistence, formatted_time for readability
 REQUIRED_COLUMNS = ['name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date']
 
+CATEGORIES = [
+    "Gestión de la demanda",
+    "Gestión de la planificación",
+    "Otros"
+]
+
 # Helper: Format seconds to HH:MM:SS
 def format_time(seconds):
     try:
@@ -247,6 +253,40 @@ def update_notes():
         if key in st.session_state:
             st.session_state.tasks[idx]['notes'] = st.session_state[key]
             save_tasks()
+
+def log_session(task_name, category, elapsed_seconds):
+    """Appends a new row to the 'Logs' worksheet."""
+    try:
+        if elapsed_seconds < 1: return # Ignore accidental clicks
+        
+        gc = get_gc()
+        secrets = find_credentials(st.secrets)
+        url = secrets.get("spreadsheet") if secrets else None
+        if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+        
+        if not url: return
+
+        sh = gc.open_by_url(url)
+        
+        # Get or create 'Logs' worksheet
+        try:
+            ws_logs = sh.worksheet("Logs")
+        except:
+            ws_logs = sh.add_worksheet(title="Logs", rows=1000, cols=5)
+            ws_logs.append_row(["Date", "Task Name", "Category", "Duration (s)", "Duration (Formatted)"])
+            
+        # Append log data
+        today_str = datetime.now().strftime("%d/%m/%Y")
+        ws_logs.append_row([
+            today_str,
+            task_name,
+            category,
+            elapsed_seconds,
+            format_time(elapsed_seconds)
+        ])
+        
+    except Exception as e:
+        st.warning(f"Could not log session: {e}")
 
 @st.dialog("⚠️ Delete Task")
 def delete_confirmation(index):
