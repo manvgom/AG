@@ -28,7 +28,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 # Added start_epoch for persistence, formatted_time for readability
-REQUIRED_COLUMNS = ['name', 'formatted_time', 'status', 'start_epoch']
+REQUIRED_COLUMNS = ['name', 'category', 'formatted_time', 'status', 'start_epoch']
 
 # Helper: Format seconds to HH:MM:SS
 def format_time(seconds):
@@ -298,11 +298,15 @@ st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
 # Input Section
-col1, col2 = st.columns([3, 1])
+col1, col2, col3 = st.columns([3, 2, 1])
 with col1:
     st.text_input("New Task Name", key="new_task_input", placeholder="Enter task description...")
 with col2:
-    st.markdown("##") # Spacer to align button
+    st.text_input("Category", key="new_category_input", placeholder="Project/Type")
+with col3:
+    # Use spaces or markdown to push button down to align with inputs
+    st.markdown("##") 
+    st.markdown("<div style='margin-top: -5px;'></div>", unsafe_allow_html=True) # Fine tuning alignment
     st.button("Add Task", on_click=add_task, use_container_width=True)
 
 st.markdown("### My Tasks")
@@ -311,30 +315,35 @@ st.markdown("### My Tasks")
 if not st.session_state.tasks:
     st.info("No tasks found. Add one to start tracking!")
 else:
-    # Header row
-    cols = st.columns([0.5, 3, 1.5, 1.5, 1.0, 0.5])
+    # Header row (Added Category column)
+    # Col widths: Index, Name, Category, Status, Duration, Action, Del
+    cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5])
     cols[0].markdown("**#**")
     cols[1].markdown("**Task Name**")
-    cols[2].markdown("**Status**")
-    cols[3].markdown("**Duration**")
-    cols[4].markdown("**Action**")
-    cols[5].markdown("**Del**")
+    cols[2].markdown("**Category**")
+    cols[3].markdown("**Status**")
+    cols[4].markdown("**Duration**")
+    cols[5].markdown("**Action**")
+    cols[6].markdown("**Del**")
 
     # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
-            cols = st.columns([0.5, 3, 1.5, 1.5, 1.0, 0.5])
+            cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5])
             
             # Index
             cols[0].text(f"{idx + 1}")
             
             # Name
-            cols[1].text(task['name'])
+            cols[1].text(task.get('name', ''))
+            
+            # Category
+            cols[2].text(task.get('category', ''))
             
             # Status
             is_running = (idx == st.session_state.active_task_idx)
             status_color = "green" if is_running else "grey"
-            cols[2].markdown(f":{status_color}[{task['status']}]")
+            cols[3].markdown(f":{status_color}[{task.get('status', 'Pending')}]")
             
             # Duration Calculation
             try:
@@ -349,15 +358,15 @@ else:
                 start_t = st.session_state.start_time or time.time()
                 current_total += (time.time() - start_t)
             
-            cols[3].code(format_time(current_total))
+            cols[4].code(format_time(current_total))
             
             # Action Button
             btn_label = "Stop" if is_running else "Start"
             btn_type = "primary" if is_running else "secondary"
-            cols[4].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+            cols[5].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
             
             # Delete Button
-            cols[5].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_task, args=(idx,), use_container_width=True)
+            cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_task, args=(idx,), use_container_width=True)
             
     st.markdown("---")
 
