@@ -358,6 +358,32 @@ def delete_confirmation(index):
         save_tasks()
         st.rerun()
 
+@st.dialog("✏️ Edit Task")
+def edit_task_dialog(index):
+    task = st.session_state.tasks[index]
+    
+    new_id = st.text_input("ID", value=task.get('id', ''))
+    new_name = st.text_input("Description", value=task.get('name', ''))
+    
+    # Category Selectbox
+    current_cat = task.get('category', 'Otros')
+    try:
+        cat_idx = CATEGORIES.index(current_cat)
+    except:
+        cat_idx = 0
+    new_cat = st.selectbox("Category", CATEGORIES, index=cat_idx)
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Cancel", use_container_width=True):
+        st.rerun()
+        
+    if col2.button("Save", type="primary", use_container_width=True):
+        st.session_state.tasks[index]['id'] = new_id
+        st.session_state.tasks[index]['name'] = new_name
+        st.session_state.tasks[index]['category'] = new_cat
+        save_tasks()
+        st.rerun()
+
 def add_task():
     task_id = st.session_state.get("new_task_id", "").strip()
     task_name = st.session_state.get("new_task_input", "").strip()
@@ -560,15 +586,15 @@ with tab_tracker:
                 
                 with st.expander(header_str, expanded=is_expanded):
                     # Header row for the group content
-                    # Col widths: Category, Date, Status, Duration, Action, Note, Del
-                    h_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7], vertical_alignment="center")
+                    # Col widths: Category, Date, Status, Duration, Action, Edit, Note, Del
+                    h_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                     h_cols[0].markdown("**Category**")
                     h_cols[1].markdown("**Date**")
                     h_cols[2].markdown("**Status**")
                     h_cols[3].markdown("**Duration**")
                     
                     for idx, task in g_tasks:
-                        r_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7], vertical_alignment="center")
+                        r_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
                         # Category
                         r_cols[0].text(task.get('category', ''))
@@ -633,9 +659,12 @@ with tab_tracker:
                             disabled=btn_disabled
                         )
                         
-                        r_cols[5].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        if r_cols[5].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True):
+                            pass
+
+                        r_cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
                         
-                        if r_cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                        if r_cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                             pass
                             
                         # Notes Area
