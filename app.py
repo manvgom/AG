@@ -38,31 +38,7 @@ if not st.session_state.authenticated:
         
     st.stop() # Block app execution
 
-# Sidebar Logout & Settings
-with st.sidebar:
-    if st.button("🔒 Logout", key="logout_btn"):
-        logout()
-    
-    st.markdown("---")
-    
-    # Category Management
-    load_categories() # Ensure loaded
-    with st.expander("⚙️ Manage Categories"):
-        new_cat = st.text_input("New Category", placeholder="Name...", key="sidebar_new_cat")
-        if st.button("Add Category"):
-            if new_cat:
-                add_category(new_cat)
-                st.rerun()
-        
-        st.markdown("##### Current List:")
-        for cat in st.session_state.categories_list:
-            c1, c2 = st.columns([4, 1])
-            c1.text(cat)
-            if c2.button("❌", key=f"rm_cat_{cat}"):
-                remove_category(cat)
-                st.rerun()
 
-# ----------------------
 
 # Custom CSS for premium look
 st.markdown("""
@@ -603,6 +579,31 @@ def toggle_timer(index):
     save_tasks()
         
 
+
+
+# Sidebar Logout & Settings
+with st.sidebar:
+    if st.button("🔒 Logout", key="logout_btn"):
+        logout()
+    
+    st.markdown("---")
+    
+    # Category Management
+    load_categories() # Ensure loaded
+    with st.expander("⚙️ Manage Categories"):
+        new_cat = st.text_input("New Category", placeholder="Name...", key="sidebar_new_cat")
+        if st.button("Add Category"):
+            if new_cat:
+                add_category(new_cat)
+                st.rerun()
+        
+        st.markdown("##### Current List:")
+        for cat in st.session_state.categories_list:
+            c1, c2 = st.columns([4, 1])
+            c1.text(cat)
+            if c2.button("❌", key=f"rm_cat_{cat}"):
+                remove_category(cat)
+                st.rerun()
 
 # Header
 st.title("⏱️ Tasks Monitor")
