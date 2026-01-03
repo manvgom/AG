@@ -28,7 +28,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 # Added start_epoch for persistence, formatted_time for readability
-REQUIRED_COLUMNS = ['name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date']
+REQUIRED_COLUMNS = ['id', 'name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date']
 
 CATEGORIES = [
     "Gestión de la demanda",
@@ -148,12 +148,14 @@ def load_tasks():
                 status = 'Running ⏱️' 
             
             clean_row = {
+                'id': str(row.get('id', '')),
                 'name': str(row.get('name', '')),
                 'category': str(row.get('category', '')),
                 'total_seconds': total_sec,
-                'status': status,
+                # 'status' removed from logic completely
                 'start_epoch': start_ep,
-                'notes': str(row.get('notes', ''))
+                'notes': str(row.get('notes', '')),
+                'created_date': str(row.get('created_date', ''))
             }
             validated_data.append(clean_row)
         
@@ -203,12 +205,13 @@ def save_tasks():
             t_sec = task.get('total_seconds', 0)
             
             row = [
+                task.get('id', ''),
                 task.get('name', ''),
                 task.get('category', ''),
                 format_time(t_sec), 
-                task.get('status', 'Pending'),
-                task.get('start_epoch', 0.0),
-                task.get('notes', '')
+                task.get('start_epoch', 0.0), # No status
+                task.get('notes', ''),
+                task.get('created_date', '')
             ]
             values.append(row)
             
@@ -311,6 +314,7 @@ def delete_confirmation(index):
         st.rerun()
 
 def add_task():
+    task_id = st.session_state.get("new_task_id", "")
     task_name = st.session_state.new_task_input
     task_category = st.session_state.get("new_category_input", "") 
     
@@ -319,16 +323,17 @@ def add_task():
         current_date = datetime.now().strftime("%d/%m/%Y")
 
         st.session_state.tasks.append({
+            'id': task_id,
             'name': task_name,
             'category': task_category,
             'total_seconds': 0,
-            # 'status' removed
             'start_epoch': 0.0,
             'notes': "",
             'created_date': current_date
         })
         st.session_state.new_task_input = "" 
         st.session_state.new_category_input = "" 
+        st.session_state.new_task_id = "" # Clear ID
         save_tasks()
 
 # Old delete helpers removed in favor of dialog logic
