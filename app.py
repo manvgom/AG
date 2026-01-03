@@ -7,7 +7,7 @@ from google.oauth2.service_account import Credentials
 import altair as alt
 
 # Page configuration
-st.set_page_config(page_title="Tasks Monitor", page_icon="⏱️", layout="wide")
+st.set_page_config(page_title="Tasks Monitor", page_icon="🖥️", layout="wide")
 
 # --- AUTHENTICATION ---
 if "authenticated" not in st.session_state:
@@ -642,7 +642,7 @@ with st.sidebar:
         logout()
 
 # Header
-st.title("⏱️ Tasks Monitor")
+st.title("🖥️ Tasks Monitor")
 st.markdown("---")
 
 # Tabs
