@@ -1015,28 +1015,6 @@ with tab_logs:
         except:
             pass
 
-    # Clear Logs Button
-    if not st.session_state.logs_data.empty:
-        col_logs1, col_logs2 = st.columns([6, 1])
-        with col_logs2:
-             if st.button("🗑️ Clear History", type="secondary", use_container_width=True):
-                 try:
-                     gc = get_gc()
-                     secrets = find_credentials(st.secrets)
-                     url = secrets.get("spreadsheet") if secrets else None
-                     if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
-                     if url:
-                         sh = gc.open_by_url(url)
-                         ws_logs = sh.worksheet("Logs")
-                         ws_logs.clear()
-                         # Restore headers
-                         NEW_HEADERS = ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
-                         ws_logs.append_row(NEW_HEADERS)
-                         st.session_state.logs_data = pd.DataFrame(columns=NEW_HEADERS)
-                         st.rerun()
-                 except Exception as e:
-                     st.error(f"Error clearing logs: {e}")
-    
     if "logs_data" in st.session_state and isinstance(st.session_state.logs_data, pd.DataFrame):
         df_log = st.session_state.logs_data
         if not df_log.empty:
