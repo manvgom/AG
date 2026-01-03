@@ -271,18 +271,21 @@ def delete_confirmation(index):
         st.rerun()
 
 def add_task():
-    # ... (existing add_task logic)
     task_name = st.session_state.new_task_input
     task_category = st.session_state.get("new_category_input", "") 
     
     if task_name:
+        # Capture current date
+        current_date = datetime.now().strftime("%d/%m/%Y")
+
         st.session_state.tasks.append({
             'name': task_name,
             'category': task_category,
             'total_seconds': 0,
             'status': 'Pending',
             'start_epoch': 0.0,
-            'notes': ""
+            'notes': "",
+            'created_date': current_date
         })
         st.session_state.new_task_input = "" 
         st.session_state.new_category_input = "" 
