@@ -392,6 +392,39 @@ def update_notes():
             st.session_state.tasks[idx]['notes'] = st.session_state[key]
             save_tasks()
 
+@st.dialog("➕ Add New Category to Task")
+def add_sibling_task_dialog(task_id, task_name):
+    st.write(f"Adding new category for: **{task_id} - {task_name}**")
+    
+    # Category Selection
+    load_categories()
+    categories = st.session_state.categories_list
+    new_cat = st.selectbox("Select New Category", categories, key="sibling_cat_select")
+    
+    if st.button("Create Task Variant", type="primary", use_container_width=True):
+        if not new_cat:
+            st.error("Please select a category.")
+            return
+
+        current_date = datetime.now().strftime("%d/%m/%Y")
+        
+        # Determine status. Default To Do.
+        
+        new_task = {
+            'id': task_id,
+            'name': task_name,
+            'category': new_cat,
+            'status': 'To Do',
+            'total_seconds': 0.0,
+            'start_epoch': 0.0,
+            'notes': '',
+            'created_date': current_date
+        }
+        
+        st.session_state.tasks.append(new_task)
+        save_tasks()
+        st.rerun()
+
 def log_session(task_id, task_name, category, elapsed_seconds, start_epoch, end_epoch):
     """Appends a new row to the 'Logs' worksheet with the format:
        ID, Descripción, Categoría, Fecha Inicio, Fecha Fin, Tiempo
@@ -770,7 +803,19 @@ with tab_tracker:
                 # Default open if filtered or running
                 is_expanded = (len(groups) == 1) or running_in_group
                 
-                with st.expander(header_str, expanded=is_expanded):
+                
+                # Header Row: Expander + Add Button
+                col_expander, col_header_btn = st.columns([0.94, 0.06])
+                
+                with col_header_btn:
+                     st.write("") # Spacer for alignment
+                     st.write("") # Extra Spacer
+                     
+                     if st.button("➕", key=f"add_sibling_{g_id}_{g_name}", help="Add new category for this task"):
+                         add_sibling_task_dialog(g_id, g_name)
+
+                with col_expander:
+                     with st.expander(header_str, expanded=is_expanded):
                     # Header row for the group content
                     # Col widths: Category, Date, Status, Duration, Action, Edit, Note, Del
                     h_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
