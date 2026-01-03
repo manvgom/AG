@@ -798,8 +798,7 @@ with tab_analytics:
 
 
 
-            )
-            st.altair_chart(bar_chart, use_container_width=True)
+
 
 with tab_logs:
     st.subheader("📜 Session History")
