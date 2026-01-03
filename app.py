@@ -922,23 +922,26 @@ with tab_tracker:
                         if is_running:
                             r_cols[2].markdown("**:orange[Doing ⚡]**")
                         else:
-                            # Selectbox for status
-                            # Find index of current status
-                            try:
-                                status_idx = STATUS_OPTIONS.index(current_status)
-                            except:
-                                status_idx = 0
-                                
-                            new_status = r_cols[2].selectbox(
-                                "Status",
-                                STATUS_OPTIONS,
-                                index=status_idx,
-                                key=f"status_sb_{idx}",
-                                label_visibility="collapsed"
-                            )
-                            if new_status != current_status:
-                                update_status(idx, new_status)
-                                st.rerun()
+                            # A/B TEST: Checkbox vs Button
+                            # Layout: [Checkbox] [Button]
+                            c_status, b_status = r_cols[2].columns([1, 1])
+                            
+                            # 1. Checkbox ("Done")
+                            is_done = (current_status == 'Done')
+                            if c_status.checkbox("Done", value=is_done, key=f"chk_done_{idx}", label_visibility="collapsed"):
+                                if not is_done:
+                                    update_status(idx, 'Done')
+                                    st.rerun()
+                            else:
+                                if is_done:
+                                    update_status(idx, 'To Do')
+                                    st.rerun()
+                                    
+                            # 2. Button ("Finish") - Only show if not done to avoid clutter
+                            if not is_done:
+                                if b_status.button("🏁", key=f"btn_finish_{idx}", help="Mark as Done"):
+                                    update_status(idx, 'Done')
+                                    st.rerun()
 
                         # Duration Calculation
                         try:
