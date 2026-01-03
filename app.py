@@ -505,7 +505,7 @@ else:
         # Loop to render rows (using filtered list)
         for idx, task in filtered_tasks:
             with st.container():
-                cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
+                cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
                 
                 # Index
                 cols[0].text(f"{idx + 1}")
