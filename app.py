@@ -612,7 +612,8 @@ def manage_categories_dialog():
 
 # Sidebar Logout & Settings
 with st.sidebar:
-    if st.button("🔒 Logout", key="logout_btn"):
+    st.title("Menu")
+    if st.button("🔒 Logout", key="logout_btn", use_container_width=True):
         logout()
     
     st.markdown("---")
