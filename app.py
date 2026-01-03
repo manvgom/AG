@@ -606,6 +606,7 @@ def manage_categories_dialog():
                 st.rerun()
     
     if st.button("Close", key="close_cat_dialog"):
+        st.session_state.show_cat_dialog = False
         st.rerun()
 
 
@@ -619,7 +620,16 @@ with st.sidebar:
     # Category Management
     load_categories() # Ensure loaded
     
-    if st.button("⚙️ Manage Categories", use_container_width=True):
+    # Initialize dialog state
+    if 'show_cat_dialog' not in st.session_state:
+        st.session_state.show_cat_dialog = False
+        
+    def open_cat_dialog():
+        st.session_state.show_cat_dialog = True
+    
+    st.button("⚙️ Manage Categories", use_container_width=True, on_click=open_cat_dialog)
+
+    if st.session_state.show_cat_dialog:
         manage_categories_dialog()
 
 # Header
