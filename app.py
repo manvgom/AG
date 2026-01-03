@@ -218,6 +218,23 @@ if 'active_task_idx' not in st.session_state:
 if 'start_time' not in st.session_state:
     st.session_state.start_time = None
 
+if 'active_note_idx' not in st.session_state:
+    st.session_state.active_note_idx = None
+
+def toggle_notes(index):
+    if st.session_state.active_note_idx == index:
+        st.session_state.active_note_idx = None
+    else:
+        st.session_state.active_note_idx = index
+
+def update_notes():
+    idx = st.session_state.active_note_idx
+    if idx is not None:
+        key = f"note_content_{idx}"
+        if key in st.session_state:
+            st.session_state.tasks[idx]['notes'] = st.session_state[key]
+            save_tasks()
+
 def add_task():
     task_name = st.session_state.new_task_input
     task_category = st.session_state.get("new_category_input", "") # Safely get category
