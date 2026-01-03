@@ -455,8 +455,6 @@ with tab_tracker:
     with col3:
         st.button("Add", on_click=add_task, use_container_width=True)
 
-    st.markdown("### My Tasks")
-
     # Filters
     with st.expander("🔎 Filters", expanded=False):
         col_f1, col_f2, col_f3 = st.columns([2, 1.5, 1.5])
@@ -588,7 +586,6 @@ with tab_tracker:
         st.markdown("---")
 
 with tab_analytics:
-    st.header("📊 Task Analytics")
     if not st.session_state.tasks:
         st.info("No data available yet.")
     else:
