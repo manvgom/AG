@@ -591,35 +591,35 @@ with tab_analytics:
         if df.empty:
             st.warning("No data found for the selected date range.")
         else:
-            col_c1, col_c2 = st.columns(2)
-        
-            with col_c1:
-                st.subheader("Time by Category")
-                # Aggregate for Category
-                df_cat = df.groupby('category')['Hours'].sum().reset_index()
-                # Sort descending
-                df_cat = df_cat.sort_values(by="Hours", ascending=False)
-                
-                # Altair Donut Chart
-                base = alt.Chart(df_cat).encode(theta=alt.Theta("Hours", stack=True))
-                pie = base.mark_arc(outerRadius=120).encode(
-                    color=alt.Color("category"),
-                    order=alt.Order("Hours", sort="descending"),
-                    tooltip=["category", alt.Tooltip("Hours", format=".2f")]
-                )
-                text = base.mark_text(radius=140).encode(
-                    text=alt.Text("Hours", format=".1f"),
-                    order=alt.Order("Hours", sort="descending"),
-                    color=alt.value("black")  
-                )
-                st.altair_chart(pie + text, use_container_width=True)
+            # Chart 1: Time by Category
+            st.subheader("Time by Category")
+            # Aggregate for Category
+            df_cat = df.groupby('category')['Hours'].sum().reset_index()
+            # Sort descending
+            df_cat = df_cat.sort_values(by="Hours", ascending=False)
+            
+            # Altair Donut Chart
+            base = alt.Chart(df_cat).encode(theta=alt.Theta("Hours", stack=True))
+            pie = base.mark_arc(outerRadius=120).encode(
+                color=alt.Color("category"),
+                order=alt.Order("Hours", sort="descending"),
+                tooltip=["category", alt.Tooltip("Hours", format=".2f")]
+            )
+            text = base.mark_text(radius=140).encode(
+                text=alt.Text("Hours", format=".1f"),
+                order=alt.Order("Hours", sort="descending"),
+                color=alt.value("black")  
+            )
+            st.altair_chart(pie + text, use_container_width=True)
 
-            with col_c2:
-                st.subheader("Time by Task ID")
-                # Aggregate by ID (or name if ID is missing)
-                df['DisplayID'] = df['id'].astype(str).where(df['id'].astype(str) != "", df['name'])
-                df_id = df.groupby('DisplayID')['Hours'].sum().sort_values(ascending=False)
-                st.bar_chart(df_id)
+            st.markdown("---")
+
+            # Chart 2: Time by Task ID
+            st.subheader("Time by Task ID")
+            # Aggregate by ID (or name if ID is missing)
+            df['DisplayID'] = df['id'].astype(str).where(df['id'].astype(str) != "", df['name'])
+            df_id = df.groupby('DisplayID')['Hours'].sum().sort_values(ascending=False)
+            st.bar_chart(df_id)
 
 # Auto-refresh if timer is running
 if st.session_state.active_task_idx is not None:
