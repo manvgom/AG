@@ -459,65 +459,65 @@ else:
 
         # Loop to render rows (using filtered list)
         for idx, task in filtered_tasks:
-        with st.container():
-            cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
-            
-            # Index
-            cols[0].text(f"{idx + 1}")
-            
-            # ID
-            cols[1].text(task.get('id', ''))
+            with st.container():
+                cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
+                
+                # Index
+                cols[0].text(f"{idx + 1}")
+                
+                # ID
+                cols[1].text(task.get('id', ''))
 
-            # Name (Description)
-            cols[2].text(task.get('name', ''))
-            
-            # Category
-            cols[3].text(task.get('category', ''))
+                # Name (Description)
+                cols[2].text(task.get('name', ''))
+                
+                # Category
+                cols[3].text(task.get('category', ''))
 
-            # Date
-            cols[4].text(task.get('created_date', '-'))
-            
-            # Status Column REMOVED
-            is_running = (idx == st.session_state.active_task_idx)
-            
-            # Duration Calculation
-            try:
-                raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
-                current_total = float(raw_val)
-            except:
-                current_total = 0.0
-            
-            # If running, add ONLY the elapsed time since start (don't mutate session state here)
-            if is_running:
-                # Use stored start_time for smooth UI updates
-                start_t = st.session_state.start_time or time.time()
-                current_total += (time.time() - start_t)
-            
-            cols[5].code(format_time(current_total))
-            
-            # Action Button (Icon based)
-            btn_label = "⏹️" if is_running else "▶️"
-            btn_type = "primary" if is_running else "secondary"
-            cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
-            
-            # Notes Button
-            cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
-            
-            # Delete Button
-            if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
-                pass # The click triggers the dialog logic via the callback
-            
-            # Notes Area (Conditional)
-            if st.session_state.active_note_idx == idx:
-                st.markdown(f"**Notes for: {task.get('name', '')}**")
-                st.text_area(
-                    "Notes", 
-                    value=task.get('notes', ''), 
-                    key=f"note_content_{idx}",
-                    on_change=update_notes,
-                    label_visibility="collapsed",
-                    placeholder="Write details here..."
-                )
+                # Date
+                cols[4].text(task.get('created_date', '-'))
+                
+                # Status Column REMOVED
+                is_running = (idx == st.session_state.active_task_idx)
+                
+                # Duration Calculation
+                try:
+                    raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                    current_total = float(raw_val)
+                except:
+                    current_total = 0.0
+                
+                # If running, add ONLY the elapsed time since start (don't mutate session state here)
+                if is_running:
+                    # Use stored start_time for smooth UI updates
+                    start_t = st.session_state.start_time or time.time()
+                    current_total += (time.time() - start_t)
+                
+                cols[5].code(format_time(current_total))
+                
+                # Action Button (Icon based)
+                btn_label = "⏹️" if is_running else "▶️"
+                btn_type = "primary" if is_running else "secondary"
+                cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+                
+                # Notes Button
+                cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                
+                # Delete Button
+                if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                    pass # The click triggers the dialog logic via the callback
+                
+                # Notes Area (Conditional)
+                if st.session_state.active_note_idx == idx:
+                    st.markdown(f"**Notes for: {task.get('name', '')}**")
+                    st.text_area(
+                        "Notes", 
+                        value=task.get('notes', ''), 
+                        key=f"note_content_{idx}",
+                        on_change=update_notes,
+                        label_visibility="collapsed",
+                        placeholder="Write details here..."
+                    )
             
     st.markdown("---")
 
