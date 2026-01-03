@@ -282,7 +282,7 @@ def add_task():
             'name': task_name,
             'category': task_category,
             'total_seconds': 0,
-            'status': 'Pending',
+            # 'status' removed
             'start_epoch': 0.0,
             'notes': "",
             'created_date': current_date
@@ -311,7 +311,7 @@ def toggle_timer(index):
         if elapsed < 0: elapsed = 0 
         
         st.session_state.tasks[prev_idx]['total_seconds'] += elapsed
-        st.session_state.tasks[prev_idx]['status'] = 'Paused'
+        # Status update removed
         st.session_state.tasks[prev_idx]['start_epoch'] = 0.0 
         
         st.session_state.active_task_idx = None
@@ -330,7 +330,7 @@ def toggle_timer(index):
         if elapsed < 0: elapsed = 0
         
         st.session_state.tasks[index]['total_seconds'] += elapsed
-        st.session_state.tasks[index]['status'] = 'Paused'
+        # Status update removed
         st.session_state.tasks[index]['start_epoch'] = 0.0 
         
         st.session_state.active_task_idx = None
@@ -339,7 +339,7 @@ def toggle_timer(index):
         # START
         st.session_state.active_task_idx = index
         st.session_state.start_time = current_time
-        st.session_state.tasks[index]['status'] = 'Running ⏱️'
+        # Status update removed
         st.session_state.tasks[index]['start_epoch'] = current_time 
     
     save_tasks()
@@ -364,23 +364,25 @@ if not st.session_state.tasks:
     st.info("No tasks found. Add one to start tracking!")
 else:
     # Header row
-    # Col widths: Index (#), Date, Name, Category, Status, Duration, Action, Note, Del
-    # Adjusted weights: 0.5, 1.2, 2.5, 1.8, 1.3, 1.2, 0.5, 0.5, 0.5 = 10.0
-    cols = st.columns([0.5, 1.2, 2.5, 1.8, 1.3, 1.2, 0.5, 0.5, 0.5])
+    # Col widths: Index (#), Date, Name, Category, Duration, Action, Note, Del
+    # Status removed. Distribute weights.
+    # Total ~10. Old Status was 1.3. Give to Name (+0.5) and Category (+0.8) approx.
+    # New: 0.5, 1.2, 3.0, 2.6, 1.2, 0.5, 0.5, 0.5 = 10.0
+    cols = st.columns([0.5, 1.2, 3.0, 2.6, 1.2, 0.5, 0.5, 0.5])
     cols[0].markdown("**#**")
     cols[1].markdown("**Date**")
     cols[2].markdown("**Task Name**")
     cols[3].markdown("**Category**")
-    cols[4].markdown("**Status**")
-    cols[5].markdown("**Duration**")
-    cols[6].markdown("") # Action
-    cols[7].markdown("") # Note
-    cols[8].markdown("") # Del
+    # Status Header Removed
+    cols[4].markdown("**Duration**")
+    cols[5].markdown("") # Action
+    cols[6].markdown("") # Note
+    cols[7].markdown("") # Del
 
     # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
-            cols = st.columns([0.5, 1.2, 2.5, 1.8, 1.3, 1.2, 0.5, 0.5, 0.5])
+            cols = st.columns([0.5, 1.2, 3.0, 2.6, 1.2, 0.5, 0.5, 0.5])
             
             # Index
             cols[0].text(f"{idx + 1}")
@@ -394,10 +396,8 @@ else:
             # Category
             cols[3].text(task.get('category', ''))
             
-            # Status
+            # Status Column REMOVED
             is_running = (idx == st.session_state.active_task_idx)
-            status_color = "green" if is_running else "grey"
-            cols[4].markdown(f":{status_color}[{task.get('status', 'Pending')}]")
             
             # Duration Calculation
             try:
@@ -412,18 +412,18 @@ else:
                 start_t = st.session_state.start_time or time.time()
                 current_total += (time.time() - start_t)
             
-            cols[5].code(format_time(current_total))
+            cols[4].code(format_time(current_total))
             
             # Action Button (Icon based)
             btn_label = "⏹️" if is_running else "▶️"
             btn_type = "primary" if is_running else "secondary"
-            cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+            cols[5].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
             
             # Notes Button
-            cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+            cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
             
             # Delete Button
-            if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+            if cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                 pass # The click triggers the dialog logic via the callback
             
             # Notes Area (Conditional)
