@@ -410,27 +410,55 @@ with col3:
 
 st.markdown("### My Tasks")
 
-# Task List
+# Filters
+with st.expander("🔎 Filters", expanded=False):
+    col_f1, col_f2 = st.columns([2, 2])
+    with col_f1:
+        search_query = st.text_input("Search (ID or Description)", placeholder="Type to search...").lower()
+    with col_f2:
+        filter_categories = st.multiselect("Filter by Category", CATEGORIES)
+
+# Task List Logic
 if not st.session_state.tasks:
     st.info("No tasks found. Add one to start tracking!")
 else:
-    # Header row
-    # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
-    # New: 0.5, 1.0, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5 = ~11
-    # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
-    cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
-    cols[0].markdown("**#**")
-    cols[1].markdown("**ID**")
-    cols[2].markdown("**Description**")
-    cols[3].markdown("**Category**")
-    cols[4].markdown("**Date**")
-    cols[5].markdown("**Duration**")
-    cols[6].markdown("") # Action
-    cols[7].markdown("") # Note
-    cols[8].markdown("") # Del
+    # 1. Filter Logic
+    filtered_tasks = []
+    for i, t in enumerate(st.session_state.tasks):
+        # Match Search
+        match_search = True
+        if search_query:
+            id_match = search_query in str(t.get('id', '')).lower()
+            desc_match = search_query in str(t.get('name', '')).lower()
+            match_search = id_match or desc_match
+        
+        # Match Category
+        match_cat = True
+        if filter_categories:
+            match_cat = t.get('category') in filter_categories
+            
+        if match_search and match_cat:
+            filtered_tasks.append((i, t))
 
-    # Loop to render rows
-    for idx, task in enumerate(st.session_state.tasks):
+    if not filtered_tasks:
+        st.warning("No tasks match your filters.")
+    else:            
+        # Header row
+        # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
+        # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
+        cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
+        cols[0].markdown("**#**")
+        cols[1].markdown("**ID**")
+        cols[2].markdown("**Description**")
+        cols[3].markdown("**Category**")
+        cols[4].markdown("**Date**")
+        cols[5].markdown("**Duration**")
+        cols[6].markdown("") # Action
+        cols[7].markdown("") # Note
+        cols[8].markdown("") # Del
+
+        # Loop to render rows (using filtered list)
+        for idx, task in filtered_tasks:
         with st.container():
             cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
             
