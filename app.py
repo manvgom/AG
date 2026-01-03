@@ -612,12 +612,7 @@ def manage_categories_dialog():
 
 # Sidebar Logout & Settings
 with st.sidebar:
-    st.markdown("# Configurations")
-    st.markdown("---")
-    if st.button("🔒 Logout", key="logout_btn", use_container_width=True):
-        logout()
-    
-    st.markdown("---")
+    st.header("Configurations")
     
     # Category Management
     load_categories() # Ensure loaded
@@ -629,10 +624,17 @@ with st.sidebar:
     def open_cat_dialog():
         st.session_state.show_cat_dialog = True
     
+    # Categories Button (Primary Config)
     st.button("⚙️ Categories", use_container_width=True, on_click=open_cat_dialog)
 
     if st.session_state.show_cat_dialog:
         manage_categories_dialog()
+        
+    st.markdown("---")
+    
+    # Logout (Bottom)
+    if st.button("🔒 Logout", key="logout_btn", use_container_width=True):
+        logout()
 
 # Header
 st.title("⏱️ Tasks Monitor")
