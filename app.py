@@ -466,7 +466,7 @@ else:
         cols[1].markdown("**ID**")
         cols[2].markdown("**Description**")
         cols[3].markdown("**Category**")
-        cols[4].markdown("**Date**")
+        cols[4].markdown("**Start Date**")
         cols[5].markdown("**Duration**")
         cols[6].markdown("") # Action
         cols[7].markdown("") # Note
