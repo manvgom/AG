@@ -998,7 +998,7 @@ with tab_tracker:
                 
         st.markdown("---")
 
-
+with tab_analytics:
     # Ensure data is loaded
     ensure_logs_loaded()
     
@@ -1095,6 +1095,9 @@ with tab_tracker:
                 color=alt.value("white")  
             )
             st.altair_chart(pie + text, use_container_width=True)
+
+
+
 
 with tab_logs:
     ensure_logs_loaded()
