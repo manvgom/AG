@@ -443,6 +443,9 @@ def log_session(task_id, task_name, category, elapsed_seconds, start_epoch, end_
             duration_str
         ])
         
+        # Invalidate cache to force reload on next view
+        st.session_state.logs_data = None
+        
     except Exception as e:
         print(f"Log Error: {e}")
 
@@ -953,10 +956,6 @@ with tab_analytics:
 
 
 with tab_logs:
-    # Load Logs Button (to avoid slow load on every refresh)
-    if st.button("🔄 Refresh Logs"):
-        st.session_state.logs_data = None
-        
     if "logs_data" not in st.session_state or st.session_state.logs_data is None:
         # Load logic specific for logs
         try:
