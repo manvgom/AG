@@ -392,11 +392,13 @@ st.title("⏱️ Tasks Monitor")
 st.markdown("---")
 
 # Input Section
-col1, col2, col3 = st.columns([3, 2, 1], vertical_alignment="bottom")
+# 4 columns: ID | Description | Category | Add
+col0, col1, col2, col3 = st.columns([1, 3, 2, 1], vertical_alignment="bottom")
+with col0:
+    st.text_input("ID", key="new_task_id", placeholder="ID")
 with col1:
-    st.text_input("Task Name", key="new_task_input", placeholder="Enter task description...")
+    st.text_input("Description", key="new_task_input", placeholder="Enter task description...")
 with col2:
-    # Changed to Selectbox
     st.selectbox("Category", CATEGORIES, key="new_category_input")
 with col3:
     st.button("Add", on_click=add_task, use_container_width=True)
@@ -408,34 +410,39 @@ if not st.session_state.tasks:
     st.info("No tasks found. Add one to start tracking!")
 else:
     # Header row
-    # Col widths: Index (#), Name, Category, Date, Duration, Action, Note, Del
-    # New: 0.5, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5 = 10.0
-    cols = st.columns([0.5, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5])
+    # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
+    # New: 0.5, 1.0, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5 = ~11
+    # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
+    cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
     cols[0].markdown("**#**")
-    cols[1].markdown("**Task Name**")
-    cols[2].markdown("**Category**")
-    cols[3].markdown("**Date**")
-    cols[4].markdown("**Duration**")
-    cols[5].markdown("") # Action
-    cols[6].markdown("") # Note
-    cols[7].markdown("") # Del
+    cols[1].markdown("**ID**")
+    cols[2].markdown("**Description**")
+    cols[3].markdown("**Category**")
+    cols[4].markdown("**Date**")
+    cols[5].markdown("**Duration**")
+    cols[6].markdown("") # Action
+    cols[7].markdown("") # Note
+    cols[8].markdown("") # Del
 
     # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
-            cols = st.columns([0.5, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5])
+            cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
             
             # Index
             cols[0].text(f"{idx + 1}")
             
-            # Name
-            cols[1].text(task.get('name', ''))
+            # ID
+            cols[1].text(task.get('id', ''))
+
+            # Name (Description)
+            cols[2].text(task.get('name', ''))
             
             # Category
-            cols[2].text(task.get('category', ''))
+            cols[3].text(task.get('category', ''))
 
             # Date
-            cols[3].text(task.get('created_date', '-'))
+            cols[4].text(task.get('created_date', '-'))
             
             # Status Column REMOVED
             is_running = (idx == st.session_state.active_task_idx)
@@ -453,18 +460,18 @@ else:
                 start_t = st.session_state.start_time or time.time()
                 current_total += (time.time() - start_t)
             
-            cols[4].code(format_time(current_total))
+            cols[5].code(format_time(current_total))
             
             # Action Button (Icon based)
             btn_label = "⏹️" if is_running else "▶️"
             btn_type = "primary" if is_running else "secondary"
-            cols[5].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+            cols[6].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
             
             # Notes Button
-            cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+            cols[7].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
             
             # Delete Button
-            if cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+            if cols[8].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                 pass # The click triggers the dialog logic via the callback
             
             # Notes Area (Conditional)
