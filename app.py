@@ -630,8 +630,6 @@ with st.sidebar:
     if st.session_state.show_cat_dialog:
         manage_categories_dialog()
         
-    st.markdown("---")
-    
     # Logout (Bottom)
     if st.button("🔒 Logout", key="logout_btn", use_container_width=True):
         logout()
