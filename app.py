@@ -462,36 +462,10 @@ else:
     if not filtered_tasks:
         st.warning("No tasks match your filters.")
     else:
-        # Calculate Total Time for filtered view
-        total_view_seconds = 0.0
-        for _, t in filtered_tasks:
-            t_sec = t.get('total_seconds', 0.0)
-            # Add elapsed if running
-            if st.session_state.active_task_idx is not None:
-                # We need to check if specifically THIS task is the running one to add elapsed
-                # But 't' is just a dict copy from session state iteration? 
-                # No, st.session_state.tasks is a list of dicts. 
-                # Let's find the index.
-                # 'filtered_tasks' is a list of (index, task_dict).
-                # Check if this task's index matches active_task_idx
-                # Wait, filtered_tasks stores (original_index, task_dict).
-                pass
-
-        # Re-loop correctly for total calculation to be precise
-        # (We could do it in one pass but let's be clear)
-        for idx, task in filtered_tasks:
-            current_total = task.get('total_seconds', 0.0)
-            if idx == st.session_state.active_task_idx:
-                 start_t = st.session_state.start_time or time.time()
-                 current_total += (time.time() - start_t)
-            total_view_seconds += current_total
-
-        st.markdown(f"**Total Time (Visible):** `{format_time(total_view_seconds)}`")
-
         # Header row
         # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
         # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
-        cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5])
+        cols = st.columns([0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5], vertical_alignment="center")
         cols[0].markdown("**#**")
         cols[1].markdown("**ID**")
         cols[2].markdown("**Description**")
