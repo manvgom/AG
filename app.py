@@ -993,16 +993,6 @@ with tab_logs:
         if not df_log.empty:
             # Show newest first
             st.dataframe(df_log, use_container_width=True)
-            
-            # Optional: CSV Download for Logs
-            csv_logs = df_log.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                "📥 Download Logs (CSV)",
-                csv_logs,
-                "session_logs.csv",
-                "text/csv",
-                key='download-logs'
-            )
         else:
             st.info("No logs found yet.")
 
