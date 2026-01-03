@@ -248,21 +248,32 @@ def update_notes():
             st.session_state.tasks[idx]['notes'] = st.session_state[key]
             save_tasks()
 
-def request_delete(index):
-    st.session_state.confirm_delete_idx = index
-
-def cancel_delete():
-    st.session_state.confirm_delete_idx = None
-
-def confirm_delete(index):
-    # Perform actual deletion
-    delete_task(index)
-    st.session_state.confirm_delete_idx = None
+@st.experimental_dialog("⚠️ Delete Task")
+def delete_confirmation(index):
+    st.write("Are you sure you want to delete this task?")
+    st.write(f"**{st.session_state.tasks[index]['name']}**")
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Cancel", use_container_width=True):
+        st.rerun()
+        
+    if col2.button("Delete", type="primary", use_container_width=True):
+        # Perform actual deletion
+        # Stop timer if deleting active task
+        if st.session_state.active_task_idx == index:
+            st.session_state.active_task_idx = None
+            st.session_state.start_time = None
+        elif st.session_state.active_task_idx is not None and st.session_state.active_task_idx > index:
+            st.session_state.active_task_idx -= 1
+                
+        st.session_state.tasks.pop(index)
+        save_tasks()
+        st.rerun()
 
 def add_task():
-    # ... (existing add_task code here) ...
+    # ... (existing add_task logic)
     task_name = st.session_state.new_task_input
-    task_category = st.session_state.get("new_category_input", "") # Safely get category
+    task_category = st.session_state.get("new_category_input", "") 
     
     if task_name:
         st.session_state.tasks.append({
@@ -277,21 +288,7 @@ def add_task():
         st.session_state.new_category_input = "" 
         save_tasks()
 
-# ... (delete_task function remains same, but is called by confirm_delete) ...
-# I need to be careful not to overwrite delete_task definition if it is in the range. 
-# The range 220-400 covers a lot. I will assume delete_task is around line 237.
-# I will include it to satisfy the block.
-
-def delete_task(index):
-    # Stop timer if deleting active task
-    if st.session_state.active_task_idx == index:
-        st.session_state.active_task_idx = None
-        st.session_state.start_time = None
-    elif st.session_state.active_task_idx is not None and st.session_state.active_task_idx > index:
-        st.session_state.active_task_idx -= 1
-            
-    st.session_state.tasks.pop(index)
-    save_tasks()
+# Old delete helpers removed in favor of dialog logic
 
 def toggle_timer(index):
     # ... (toggle_timer logic remains same) ...
@@ -420,12 +417,9 @@ else:
             # Notes Button
             cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
             
-            # Delete Button (With Confirmation)
-            if st.session_state.confirm_delete_idx == idx:
-                # Show red confirm button
-                cols[7].button("⚠️", key=f"confirm_del_{idx}", type="primary", on_click=confirm_delete, args=(idx,), use_container_width=True, help="Confirm Deletion")
-            else:
-                cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=request_delete, args=(idx,), use_container_width=True)
+            # Delete Button
+            if cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                pass # The click triggers the dialog logic via the callback
             
             # Notes Area (Conditional)
             if st.session_state.active_note_idx == idx:
