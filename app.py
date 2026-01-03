@@ -63,13 +63,15 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 # Added start_epoch for persistence, formatted_time for readability
-REQUIRED_COLUMNS = ['id', 'name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date']
+REQUIRED_COLUMNS = ['id', 'name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date', 'status']
 
 CATEGORIES = [
     "Gestión de la demanda",
     "Gestión de la planificación",
     "Otros"
 ]
+
+STATUS_OPTIONS = ["To Do", "Waiting", "Done"]
 
 # Helper: Format seconds to HH:MM:SS
 def format_time(seconds):
@@ -178,18 +180,21 @@ def load_tasks():
                 start_ep = 0.0
             
             # If start_epoch is set (>0), this task is RUNNING
-            status = str(row.get('status', 'Pending'))
             if start_ep > 0:
                 active_idx_found = i
                 start_time_found = start_ep
-                status = 'Running ⏱️' 
+            
+            # Status Logic
+            status = str(row.get('status', 'To Do'))
+            if status not in STATUS_OPTIONS:
+                status = "To Do"
             
             clean_row = {
                 'id': str(row.get('id', '')),
                 'name': str(row.get('name', '')),
                 'category': str(row.get('category', '')),
                 'total_seconds': total_sec,
-                # 'status' removed from logic completely
+                'status': status,
                 'start_epoch': start_ep,
                 'notes': str(row.get('notes', '')),
                 'created_date': str(row.get('created_date', ''))
@@ -248,9 +253,10 @@ def save_tasks():
                 task.get('name', ''),
                 task.get('category', ''),
                 format_time(t_sec), 
-                task.get('start_epoch', 0.0), # No status
+                task.get('start_epoch', 0.0), 
                 task.get('notes', ''),
-                task.get('created_date', '')
+                task.get('created_date', ''),
+                task.get('status', 'To Do')
             ]
             values.append(row)
             
@@ -372,7 +378,8 @@ def add_task():
             'total_seconds': 0,
             'start_epoch': 0.0,
             'notes': "",
-            'created_date': current_date
+            'created_date': current_date,
+            'status': "To Do"
         })
         st.session_state.new_task_input = "" 
         st.session_state.new_category_input = "" 
@@ -381,59 +388,53 @@ def add_task():
 
 # Old delete helpers removed in favor of dialog logic
 
+def update_status(task_idx, new_status):
+    st.session_state.tasks[task_idx]['status'] = new_status
+    save_tasks()
+
 def toggle_timer(index):
-    # ... (toggle_timer logic remains same) ...
+    # Rule 1: One timer global
+    if st.session_state.active_task_idx is not None and st.session_state.active_task_idx != index:
+        st.toast("⚠️ Another timer is running! Stop it first.", icon="🚫")
+        return
+        
+    # Rule 2: Done means Done
+    if st.session_state.tasks[index].get('status') == 'Done':
+        st.toast("Task is marked as Done. Unable to start timer.", icon="✅")
+        return
+
     current_time = time.time()
     
-    # 1. Stop distinct previous task if running
-    if st.session_state.active_task_idx is not None and st.session_state.active_task_idx != index:
+    # Check if we are stopping the CURRENT task
+    if st.session_state.active_task_idx == index:
         prev_idx = st.session_state.active_task_idx
         prev_start = st.session_state.tasks[prev_idx].get('start_epoch', 0.0)
         
-        # Safety: If start_epoch is missing/0, assume we just started (0 elapsed) to avoid 120-year bug
-        if prev_start == 0.0:
-            prev_start = current_time
+        # Safety
+        if prev_start == 0.0: prev_start = current_time
         
-        # Calculate delta
         elapsed = current_time - prev_start
-        if elapsed < 0: elapsed = 0 
-        
-        st.session_state.tasks[prev_idx]['total_seconds'] += elapsed
-        # Status update removed
-        st.session_state.tasks[prev_idx]['start_epoch'] = 0.0 
-        
-        st.session_state.active_task_idx = None
-        st.session_state.start_time = None
-
-    # 2. Toggle clicked task
-    if st.session_state.active_task_idx == index:
-        # STOP
-        start_t = st.session_state.tasks[index].get('start_epoch', 0.0)
-        
-        # Safety check
-        if start_t == 0.0:
-            start_t = current_time
-            
-        elapsed = current_time - start_t
         if elapsed < 0: elapsed = 0
         
-        st.session_state.tasks[index]['total_seconds'] += elapsed
-        # Status update removed
-        st.session_state.tasks[index]['start_epoch'] = 0.0 
+        st.session_state.tasks[prev_idx]['total_seconds'] += elapsed
+        st.session_state.tasks[prev_idx]['start_epoch'] = 0.0
         
-        # LOG SESSION
-        log_session(task.get('name'), task.get('category'), elapsed)
-
+        # Log session
+        log_session(st.session_state.tasks[prev_idx].get('name', ''), st.session_state.tasks[prev_idx].get('category', ''), elapsed)
+        
         st.session_state.active_task_idx = None
         st.session_state.start_time = None
+        
     else:
-        # START
+        # Starting NEW task (Index != Active, and Active is None due to Rule 1)
         st.session_state.active_task_idx = index
         st.session_state.start_time = current_time
-        # Status update removed
-        st.session_state.tasks[index]['start_epoch'] = current_time 
+        st.session_state.tasks[index]['start_epoch'] = current_time
     
     save_tasks()
+    st.rerun() 
+        
+
 
 # Header
 st.title("⏱️ Tasks Monitor")
@@ -510,7 +511,9 @@ with tab_tracker:
             
             # Loop through groups
             for (g_id, g_name), g_tasks in groups.items():
-                # Check if group is active or has special state
+                # Check coverage math
+                total_subtasks = len(g_tasks)
+                completed_subtasks = sum(1 for _, t in g_tasks if t.get('status') == 'Done')
                 
                 # Calculate total group time for header
                 group_total_seconds = 0.0
@@ -530,7 +533,10 @@ with tab_tracker:
                         running_in_group = True
                 
                 header_duration = format_time(group_total_seconds)
-                header_str = f"**{g_id if g_id else 'No ID'}** - {g_name}  (⏱️ {header_duration})"
+                # Counter [X/Y]
+                progress_str = f"[{completed_subtasks}/{total_subtasks}]"
+                header_str = f"**{g_id if g_id else 'No ID'}** - {g_name}  (⏱️ {header_duration}) {progress_str}"
+                
                 if running_in_group:
                     header_str = "🟢 " + header_str
                 
@@ -540,25 +546,47 @@ with tab_tracker:
                 
                 with st.expander(header_str, expanded=is_expanded):
                     # Header row for the group content
-                    # Col widths: Category, Date, Duration, Action, Note, Del
-                    # Normalized relative to inner width
-                    # Allocating: Cat(3), Date(1.5), Dur(1.5), Act(0.8), Note(0.8), Del(0.8)
-                    h_cols = st.columns([3, 1.5, 1.5, 0.8, 0.8, 0.8], vertical_alignment="center")
+                    # Col widths: Category, Date, Status, Duration, Action, Note, Del
+                    h_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7], vertical_alignment="center")
                     h_cols[0].markdown("**Category**")
                     h_cols[1].markdown("**Date**")
-                    h_cols[2].markdown("**Duration**")
+                    h_cols[2].markdown("**Status**")
+                    h_cols[3].markdown("**Duration**")
                     
                     for idx, task in g_tasks:
-                        r_cols = st.columns([3, 1.5, 1.5, 0.8, 0.8, 0.8], vertical_alignment="center")
+                        r_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
                         # Category
                         r_cols[0].text(task.get('category', ''))
                         # Date
                         r_cols[1].text(task.get('created_date', '-'))
                         
-                        # Status/Timer Logic
+                        # Status Logic
                         is_running = (idx == st.session_state.active_task_idx)
+                        current_status = task.get('status', 'To Do')
                         
+                        # Special "Doing" state
+                        if is_running:
+                            r_cols[2].markdown("**:orange[Doing ⚡]**")
+                        else:
+                            # Selectbox for status
+                            # Find index of current status
+                            try:
+                                status_idx = STATUS_OPTIONS.index(current_status)
+                            except:
+                                status_idx = 0
+                                
+                            new_status = r_cols[2].selectbox(
+                                "Status",
+                                STATUS_OPTIONS,
+                                index=status_idx,
+                                key=f"status_sb_{idx}",
+                                label_visibility="collapsed"
+                            )
+                            if new_status != current_status:
+                                update_status(idx, new_status)
+                                st.rerun()
+
                         # Duration Calculation
                         try:
                             raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
@@ -572,18 +600,28 @@ with tab_tracker:
                         
                         dur_str = format_time(current_total)
                         if is_running:
-                             r_cols[2].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                             r_cols[3].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
                         else:
-                             r_cols[2].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
+                             r_cols[3].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
                         
                         # Buttons
                         btn_label = "⏹️" if is_running else "▶️"
                         btn_type = "primary" if is_running else "secondary"
-                        r_cols[3].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
+                        btn_disabled = (not is_running) and (current_status == 'Done')
                         
-                        r_cols[4].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        r_cols[4].button(
+                            btn_label, 
+                            key=f"btn_{idx}", 
+                            type=btn_type, 
+                            on_click=toggle_timer, 
+                            args=(idx,), 
+                            use_container_width=True,
+                            disabled=btn_disabled
+                        )
                         
-                        if r_cols[5].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                        r_cols[5].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        
+                        if r_cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                             pass
                             
                         # Notes Area
