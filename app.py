@@ -804,110 +804,104 @@ with tab_tracker:
                 is_expanded = (len(groups) == 1) or running_in_group
                 
                 
-                # Header Row: Expander + Add Button
-                # Adjusted ratio and alignment for better visuals
-                col_expander, col_header_btn = st.columns([0.92, 0.08], gap="small", vertical_alignment="center")
-                
-                with col_header_btn:
-                     # Button vertically centered by column setting
-                     if st.button("➕", key=f"add_sibling_{g_id}_{g_name}", help="Add new category for this task", use_container_width=True):
-                         add_sibling_task_dialog(g_id, g_name)
-
-                with col_expander:
-                     with st.expander(header_str, expanded=is_expanded):
-                        # Header row for the group content
-                        # Col widths: Category, Date, Status, Duration, Action, Edit, Note, Del
-                        h_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
-                        h_cols[0].markdown("**Category**")
-                        h_cols[1].markdown("**Date**")
-                        h_cols[2].markdown("**Status**")
-                        h_cols[3].markdown("**Duration**")
+                with st.expander(header_str, expanded=is_expanded):
+                    # Header row for the group content
+                    # Col widths: Category, Date, Status, Duration, Action, Edit, Note, Del
+                    h_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                    h_cols[0].markdown("**Category**")
+                    h_cols[1].markdown("**Date**")
+                    h_cols[2].markdown("**Status**")
+                    h_cols[3].markdown("**Duration**")
+                    
+                    for idx, task in g_tasks:
+                        r_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
-                        for idx, task in g_tasks:
-                            r_cols = st.columns([2.5, 1.2, 1.5, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
-                            
-                            # Category
-                            r_cols[0].text(task.get('category', ''))
-                            # Date
-                            r_cols[1].text(task.get('created_date', '-'))
-                            
-                            # Status Logic
-                            is_running = (idx == st.session_state.active_task_idx)
-                            current_status = task.get('status', 'To Do')
-                            
-                            # Special "Doing" state
-                            if is_running:
-                                r_cols[2].markdown("**:orange[Doing ⚡]**")
-                            else:
-                                # Selectbox for status
-                                # Find index of current status
-                                try:
-                                    status_idx = STATUS_OPTIONS.index(current_status)
-                                except:
-                                    status_idx = 0
-                                    
-                                new_status = r_cols[2].selectbox(
-                                    "Status",
-                                    STATUS_OPTIONS,
-                                    index=status_idx,
-                                    key=f"status_sb_{idx}",
-                                    label_visibility="collapsed"
-                                )
-                                if new_status != current_status:
-                                    update_status(idx, new_status)
-                                    st.rerun()
-    
-                            # Duration Calculation
+                        # Category
+                        r_cols[0].text(task.get('category', ''))
+                        # Date
+                        r_cols[1].text(task.get('created_date', '-'))
+                        
+                        # Status Logic
+                        is_running = (idx == st.session_state.active_task_idx)
+                        current_status = task.get('status', 'To Do')
+                        
+                        # Special "Doing" state
+                        if is_running:
+                            r_cols[2].markdown("**:orange[Doing ⚡]**")
+                        else:
+                            # Selectbox for status
+                            # Find index of current status
                             try:
-                                raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
-                                current_total = float(raw_val)
+                                status_idx = STATUS_OPTIONS.index(current_status)
                             except:
-                                current_total = 0.0
-                            
-                            if is_running:
-                                start_t = st.session_state.start_time or time.time()
-                                current_total += (time.time() - start_t)
-                            
-                            dur_str = format_time(current_total)
-                            if is_running:
-                                 r_cols[3].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
-                            else:
-                                 r_cols[3].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
-                            
-                            # Buttons
-                            btn_label = "⏹️" if is_running else "▶️"
-                            btn_type = "primary" if is_running else "secondary"
-                            btn_disabled = (not is_running) and (current_status == 'Done')
-                            
-                            r_cols[4].button(
-                                btn_label, 
-                                key=f"btn_{idx}", 
-                                type=btn_type, 
-                                on_click=toggle_timer, 
-                                args=(idx,), 
-                                use_container_width=True,
-                                disabled=btn_disabled
-                            )
-                            
-                            if r_cols[5].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True):
-                                pass
-    
-                            r_cols[6].button("📄", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
-                            
-                            if r_cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
-                                pass
+                                status_idx = 0
                                 
-                            # Notes Area
-                            if st.session_state.active_note_idx == idx:
-                                st.markdown(f"**Notes for: {task.get('category', '')}**")
-                                st.text_area(
-                                    "Notes", 
-                                    value=task.get('notes', ''), 
-                                    key=f"note_content_{idx}",
-                                    on_change=update_notes,
-                                    label_visibility="collapsed",
-                                    placeholder="Details..."
-                                )
+                            new_status = r_cols[2].selectbox(
+                                "Status",
+                                STATUS_OPTIONS,
+                                index=status_idx,
+                                key=f"status_sb_{idx}",
+                                label_visibility="collapsed"
+                            )
+                            if new_status != current_status:
+                                update_status(idx, new_status)
+                                st.rerun()
+
+                        # Duration Calculation
+                        try:
+                            raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                            current_total = float(raw_val)
+                        except:
+                            current_total = 0.0
+                        
+                        if is_running:
+                            start_t = st.session_state.start_time or time.time()
+                            current_total += (time.time() - start_t)
+                        
+                        dur_str = format_time(current_total)
+                        if is_running:
+                             r_cols[3].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                        else:
+                             r_cols[3].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
+                        
+                        # Buttons
+                        btn_label = "⏹️" if is_running else "▶️"
+                        btn_type = "primary" if is_running else "secondary"
+                        btn_disabled = (not is_running) and (current_status == 'Done')
+                        
+                        r_cols[4].button(
+                            btn_label, 
+                            key=f"btn_{idx}", 
+                            type=btn_type, 
+                            on_click=toggle_timer, 
+                            args=(idx,), 
+                            use_container_width=True,
+                            disabled=btn_disabled
+                        )
+                        
+                        if r_cols[5].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True):
+                            pass
+
+                        r_cols[6].button("📄", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        
+                        if r_cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                            pass
+                            
+                        # Notes Area
+                        if st.session_state.active_note_idx == idx:
+                            st.markdown(f"**Notes for: {task.get('category', '')}**")
+                            st.text_area(
+                                "Notes", 
+                                value=task.get('notes', ''), 
+                                key=f"note_content_{idx}",
+                                on_change=update_notes,
+                                label_visibility="collapsed",
+                                placeholder="Details..."
+                            )
+                    
+                    st.write("") # Spacer
+                    if st.button(f"➕ Add Category to {g_id}", key=f"add_sibling_{g_id}_{g_name}"):
+                         add_sibling_task_dialog(g_id, g_name)
                 
         st.markdown("---")
 
