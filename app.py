@@ -461,7 +461,33 @@ else:
 
     if not filtered_tasks:
         st.warning("No tasks match your filters.")
-    else:            
+    else:
+        # Calculate Total Time for filtered view
+        total_view_seconds = 0.0
+        for _, t in filtered_tasks:
+            t_sec = t.get('total_seconds', 0.0)
+            # Add elapsed if running
+            if st.session_state.active_task_idx is not None:
+                # We need to check if specifically THIS task is the running one to add elapsed
+                # But 't' is just a dict copy from session state iteration? 
+                # No, st.session_state.tasks is a list of dicts. 
+                # Let's find the index.
+                # 'filtered_tasks' is a list of (index, task_dict).
+                # Check if this task's index matches active_task_idx
+                # Wait, filtered_tasks stores (original_index, task_dict).
+                pass
+
+        # Re-loop correctly for total calculation to be precise
+        # (We could do it in one pass but let's be clear)
+        for idx, task in filtered_tasks:
+            current_total = task.get('total_seconds', 0.0)
+            if idx == st.session_state.active_task_idx:
+                 start_t = st.session_state.start_time or time.time()
+                 current_total += (time.time() - start_t)
+            total_view_seconds += current_total
+
+        st.markdown(f"**Total Time (Visible):** `{format_time(total_view_seconds)}`")
+
         # Header row
         # Col widths: Index (#), ID, Description, Category, Date, Duration, Action, Note, Del
         # Normalized: 0.5, 0.8, 2.5, 2.0, 1.2, 1.2, 0.5, 0.5, 0.5
@@ -512,7 +538,15 @@ else:
                     start_t = st.session_state.start_time or time.time()
                     current_total += (time.time() - start_t)
                 
-                cols[5].code(format_time(current_total))
+                # Render Duration
+                # Improvement: Use markdown for color/style
+                dur_str = format_time(current_total)
+                if is_running:
+                    # Green and bold if running
+                    cols[5].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                else:
+                    # Standard monospace
+                    cols[5].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
                 
                 # Action Button (Icon based)
                 btn_label = "⏹️" if is_running else "▶️"
