@@ -963,8 +963,13 @@ with tab_logs:
                 sh = gc.open_by_url(url)
                 try:
                     ws_logs = sh.worksheet("Logs")
-                    data = ws_logs.get_all_records()
-                    st.session_state.logs_data = pd.DataFrame(data)
+                    data = ws_logs.get_all_values()
+                    if data:
+                        headers = data[0]
+                        rows = data[1:]
+                        st.session_state.logs_data = pd.DataFrame(rows, columns=headers)
+                    else:
+                        st.session_state.logs_data = pd.DataFrame()
                 except gspread.WorksheetNotFound:
                     st.session_state.logs_data = pd.DataFrame() # Empty
                 except Exception as e:
