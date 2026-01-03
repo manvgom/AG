@@ -943,17 +943,7 @@ with tab_tracker:
                 
         st.markdown("---")
 
-with tab_analytics:
-    if not st.session_state.tasks:
-        st.info("No data available yet.")
-    else:
 
-
-
-
-
-
-with tab_analytics:
     # Ensure data is loaded
     ensure_logs_loaded()
     
