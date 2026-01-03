@@ -314,11 +314,15 @@ def delete_confirmation(index):
         st.rerun()
 
 def add_task():
-    task_id = st.session_state.get("new_task_id", "")
-    task_name = st.session_state.new_task_input
+    task_id = st.session_state.get("new_task_id", "").strip()
+    task_name = st.session_state.get("new_task_input", "").strip()
     task_category = st.session_state.get("new_category_input", "") 
     
-    if task_name:
+    if not task_id or not task_name or not task_category:
+        st.toast("⚠️ Please fill in all fields (ID, Description, Category)", icon="⚠️")
+        return
+
+    if task_name: # Redundant check but keeping logic structure
         # Capture current date
         current_date = datetime.now().strftime("%d/%m/%Y")
 
