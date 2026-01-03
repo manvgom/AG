@@ -368,20 +368,20 @@ if not st.session_state.tasks:
 else:
     # Header row (Added Category column)
     # Col widths: Index, Name, Category, Status, Duration, Action, Note, Del
-    cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5, 0.5])
+    cols = st.columns([0.5, 3, 2, 1.5, 1.5, 0.5, 0.5, 0.5])
     cols[0].markdown("**#**")
     cols[1].markdown("**Task Name**")
     cols[2].markdown("**Category**")
     cols[3].markdown("**Status**")
     cols[4].markdown("**Duration**")
-    cols[5].markdown("**Action**")
-    cols[6].markdown("**Note**")
-    cols[7].markdown("**Del**")
+    cols[5].markdown("") # Action
+    cols[6].markdown("") # Note
+    cols[7].markdown("") # Del
 
     # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
-            cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5, 0.5])
+            cols = st.columns([0.5, 3, 2, 1.5, 1.5, 0.5, 0.5, 0.5])
             
             # Index
             cols[0].text(f"{idx + 1}")
