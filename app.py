@@ -624,8 +624,11 @@ with tab_analytics:
         else:
             # Chart 1: Time by Category
             st.subheader("Time by Category")
-            # Aggregate for Category
-            df_cat = df.groupby('category')['Hours'].sum().reset_index()
+            # Aggregate for Category (Sum both Hours and Seconds for formatting)
+            df_cat = df.groupby('category').agg({'total_seconds': 'sum'}).reset_index()
+            df_cat['Hours'] = df_cat['total_seconds'] / 3600.0
+            df_cat['Formatted Time'] = df_cat['total_seconds'].apply(format_time)
+            
             # Sort descending
             df_cat = df_cat.sort_values(by="Hours", ascending=False)
             
@@ -634,10 +637,10 @@ with tab_analytics:
             pie = base.mark_arc(outerRadius=120).encode(
                 color=alt.Color("category"),
                 order=alt.Order("Hours", sort="descending"),
-                tooltip=["category", alt.Tooltip("Hours", format=".2f")]
+                tooltip=["category", "Formatted Time", alt.Tooltip("Hours", format=".2f")]
             )
             text = base.mark_text(radius=140).encode(
-                text=alt.Text("Hours", format=".1f"),
+                text=alt.Text("Formatted Time"),
                 order=alt.Order("Hours", sort="descending"),
                 color=alt.value("black")  
             )
@@ -649,8 +652,25 @@ with tab_analytics:
             st.subheader("Time by Task ID")
             # Aggregate by ID (or name if ID is missing)
             df['DisplayID'] = df['id'].astype(str).where(df['id'].astype(str) != "", df['name'])
-            df_id = df.groupby('DisplayID')['Hours'].sum().sort_values(ascending=False)
-            st.bar_chart(df_id)
+            
+            # Aggregate seconds first
+            df_id = df.groupby('DisplayID').agg({'total_seconds': 'sum'}).reset_index()
+            df_id['Hours'] = df_id['total_seconds'] / 3600.0
+            df_id['Formatted Time'] = df_id['total_seconds'].apply(format_time)
+            
+            # Sort for Bar Chart
+            df_id = df_id.sort_values(by="Hours", ascending=False)
+            
+            # Altair Bar Chart (Replacing st.bar_chart for better tooltip control)
+            bar_chart = alt.Chart(df_id).mark_bar().encode(
+                x=alt.X('Hours', title='Hours'),
+                y=alt.Y('DisplayID', sort='-x', title='Task ID'),
+                tooltip=['DisplayID', 'Formatted Time', alt.Tooltip('Hours', format='.2f')],
+                color=alt.value("#1f77b4") # Standard Blue
+            ).properties(
+                height=max(300, len(df_id) * 30) # Dynamic height based on number of bars
+            )
+            st.altair_chart(bar_chart, use_container_width=True)
 
 # Auto-refresh if timer is running
 if st.session_state.active_task_idx is not None:
