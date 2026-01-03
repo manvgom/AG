@@ -140,6 +140,11 @@ def parse_time_str(time_str):
 
 def load_categories():
     """Load categories from 'Categories' worksheet OR initialize with defaults."""
+    
+    # Init map if missing
+    if 'categories_desc' not in st.session_state:
+         st.session_state.categories_desc = {} # Name -> Desc
+
     if 'categories_list' not in st.session_state:
         # Try loading from sheet
         try:
@@ -152,47 +157,60 @@ def load_categories():
                 sh = gc.open_by_url(url)
                 try:
                     ws_cat = sh.worksheet("Categories")
-                    vals = ws_cat.col_values(1) # List of categories
-                    if not vals:
+                    # Read all values including Description
+                    all_rows = ws_cat.get_all_values()
+                    
+                    if not all_rows:
                          # Empty sheet -> Populate defaults
-                         ws_cat.append_row(["Category Name"]) # Header (optional, usually I just list raw strings)
-                         # Actually for col_values it grabs everything.
-                         # Let's say Row 1 is NOT header to keep it simple, or Row 1 Is header.
-                         # Plan: Row 1 is Header 'Category'.
                          ws_cat.clear()
-                         ws_cat.append_row(["Category"])
+                         ws_cat.append_row(["Category", "Description"])
                          for c in DEFAULT_CATEGORIES:
-                             ws_cat.append_row([c])
+                             ws_cat.append_row([c, ""])
                          st.session_state.categories_list = DEFAULT_CATEGORIES
+                         st.session_state.categories_desc = {c: "" for c in DEFAULT_CATEGORIES}
                     else:
-                        # vals[0] might be 'Category'
-                        if vals and vals[0] == "Category":
-                            loaded = vals[1:]
-                        else:
-                            loaded = vals
+                        # Parse Rows
+                        # Header is row 0
+                        data_rows = all_rows[1:]
+                        loaded_list = []
+                        loaded_desc = {}
                         
-                        # Filter empty
-                        loaded = [x for x in loaded if x.strip()]
-                        
-                        if not loaded:
-                            st.session_state.categories_list = DEFAULT_CATEGORIES
+                        for row in data_rows:
+                            if not row: continue
+                            c_name = row[0].strip()
+                            if c_name:
+                                loaded_list.append(c_name)
+                                c_desc = row[1] if len(row) > 1 else ""
+                                loaded_desc[c_name] = c_desc
+                                
+                        if not loaded_list:
+                             st.session_state.categories_list = DEFAULT_CATEGORIES
+                             st.session_state.categories_desc = {c: "" for c in DEFAULT_CATEGORIES}
                         else:
-                            st.session_state.categories_list = loaded
+                             st.session_state.categories_list = loaded_list
+                             st.session_state.categories_desc = loaded_desc
+
                 except gspread.WorksheetNotFound:
                     # Create it
-                    ws_cat = sh.add_worksheet(title="Categories", rows=100, cols=1)
-                    ws_cat.append_row(["Category"])
+                    ws_cat = sh.add_worksheet(title="Categories", rows=100, cols=2)
+                    ws_cat.append_row(["Category", "Description"])
                     for c in DEFAULT_CATEGORIES:
-                        ws_cat.append_row([c])
+                        ws_cat.append_row([c, ""])
                     st.session_state.categories_list = DEFAULT_CATEGORIES
+                    st.session_state.categories_desc = {c: "" for c in DEFAULT_CATEGORIES}
             else:
                 st.session_state.categories_list = DEFAULT_CATEGORIES
+                st.session_state.categories_desc = {c: "" for c in DEFAULT_CATEGORIES}
         except:
             st.session_state.categories_list = DEFAULT_CATEGORIES
+            st.session_state.categories_desc = {c: "" for c in DEFAULT_CATEGORIES}
 
-def add_category(new_cat_name):
+def add_category(new_cat_name, new_cat_desc=""):
     if new_cat_name and new_cat_name not in st.session_state.categories_list:
         st.session_state.categories_list.append(new_cat_name)
+        if 'categories_desc' not in st.session_state: st.session_state.categories_desc = {}
+        st.session_state.categories_desc[new_cat_name] = new_cat_desc
+        
         # Persist
         try:
             gc = get_gc()
@@ -202,7 +220,7 @@ def add_category(new_cat_name):
             if url:
                 sh = gc.open_by_url(url)
                 ws = sh.worksheet("Categories")
-                ws.append_row([new_cat_name])
+                ws.append_row([new_cat_name, new_cat_desc])
                 st.toast(f"Category '{new_cat_name}' added!", icon="✅")
         except:
              pass
@@ -210,6 +228,9 @@ def add_category(new_cat_name):
 def remove_category(cat_name):
     if cat_name in st.session_state.categories_list:
         st.session_state.categories_list.remove(cat_name)
+        if 'categories_desc' in st.session_state:
+             st.session_state.categories_desc.pop(cat_name, None)
+             
         # Persist (Overwrite list)
         try:
             gc = get_gc()
@@ -220,15 +241,16 @@ def remove_category(cat_name):
                 sh = gc.open_by_url(url)
                 ws = sh.worksheet("Categories")
                 ws.clear()
-                ws.append_row(["Category"])
+                ws.append_row(["Category", "Description"])
                 # Bulk update
-                # Transforming list to list of lists [[cat1], [cat2]]
-                rows = [[c] for c in st.session_state.categories_list]
+                rows = [[c, st.session_state.categories_desc.get(c, "")] for c in st.session_state.categories_list]
                 if rows:
-                    ws.update(f"A2:A{len(rows)+1}", rows)
+                    ws.update(f"A2:B{len(rows)+1}", rows)
                 st.toast(f"Category '{cat_name}' removed!", icon="🗑️")
         except Exception as e:
             st.warning(f"Error removing category: {e}")
+
+
 
 def load_tasks():
     try:
@@ -400,6 +422,12 @@ def add_sibling_task_dialog(task_id, task_name):
     load_categories()
     categories = st.session_state.categories_list
     new_cat = st.selectbox("Select New Category", categories, key="sibling_cat_select")
+    
+    # Show description
+    if 'categories_desc' in st.session_state:
+        desc = st.session_state.categories_desc.get(new_cat, "")
+        if desc:
+            st.info(f"💡 {desc}")
     
     if st.button("Create Task Variant", type="primary", use_container_width=True):
         if not new_cat:
@@ -621,10 +649,11 @@ def manage_categories_dialog():
     st.write("Add or remove categories below.")
     
     new_cat = st.text_input("New Category Name", placeholder="e.g. Design, Meeting...", key="dialog_new_cat")
+    new_desc = st.text_area("Description (Optional)", placeholder="Context about this category...", key="dialog_new_desc")
     
     if st.button("Add Category", type="primary", use_container_width=True):
         if new_cat:
-            add_category(new_cat)
+            add_category(new_cat, new_desc)
             st.rerun()
             
     st.markdown("---")
@@ -633,10 +662,19 @@ def manage_categories_dialog():
     if not st.session_state.categories_list:
         st.info("No categories found.")
     else:
+        # Ensure desc map exists
+        if 'categories_desc' not in st.session_state: st.session_state.categories_desc = {}
+        
         for cat in st.session_state.categories_list:
+            desc = st.session_state.categories_desc.get(cat, "")
+            
             c1, c2 = st.columns([4, 1], vertical_alignment="center")
-            c1.text(cat)
-            if c2.button("🗑️", key=f"rm_cat_dialog_{cat}"): # Changed key to avoid conflict if any phantom state
+            if desc:
+                c1.markdown(f"**{cat}**<br><span style='color:grey; font-size:0.8em;'>{desc}</span>", unsafe_allow_html=True)
+            else:
+                c1.text(cat)
+                
+            if c2.button("🗑️", key=f"rm_cat_dialog_{cat}"):
                 remove_category(cat)
                 st.rerun()
     
