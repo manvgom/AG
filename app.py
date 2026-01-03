@@ -408,16 +408,13 @@ if not st.session_state.tasks:
     st.info("No tasks found. Add one to start tracking!")
 else:
     # Header row
-    # Col widths: Index (#), Date, Name, Category, Duration, Action, Note, Del
-    # Status removed. Distribute weights.
-    # Total ~10. Old Status was 1.3. Give to Name (+0.5) and Category (+0.8) approx.
-    # New: 0.5, 1.2, 3.0, 2.6, 1.2, 0.5, 0.5, 0.5 = 10.0
-    cols = st.columns([0.5, 1.2, 3.0, 2.6, 1.2, 0.5, 0.5, 0.5])
+    # Col widths: Index (#), Name, Category, Date, Duration, Action, Note, Del
+    # New: 0.5, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5 = 10.0
+    cols = st.columns([0.5, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5])
     cols[0].markdown("**#**")
-    cols[1].markdown("**Date**")
-    cols[2].markdown("**Task Name**")
-    cols[3].markdown("**Category**")
-    # Status Header Removed
+    cols[1].markdown("**Task Name**")
+    cols[2].markdown("**Category**")
+    cols[3].markdown("**Date**")
     cols[4].markdown("**Duration**")
     cols[5].markdown("") # Action
     cols[6].markdown("") # Note
@@ -426,19 +423,19 @@ else:
     # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
-            cols = st.columns([0.5, 1.2, 3.0, 2.6, 1.2, 0.5, 0.5, 0.5])
+            cols = st.columns([0.5, 3.0, 2.6, 1.2, 1.2, 0.5, 0.5, 0.5])
             
             # Index
             cols[0].text(f"{idx + 1}")
             
-            # Date
-            cols[1].text(task.get('created_date', '-'))
-            
             # Name
-            cols[2].text(task.get('name', ''))
+            cols[1].text(task.get('name', ''))
             
             # Category
-            cols[3].text(task.get('category', ''))
+            cols[2].text(task.get('category', ''))
+
+            # Date
+            cols[3].text(task.get('created_date', '-'))
             
             # Status Column REMOVED
             is_running = (idx == st.session_state.active_task_idx)
