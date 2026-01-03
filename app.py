@@ -628,7 +628,7 @@ with st.sidebar:
     def open_cat_dialog():
         st.session_state.show_cat_dialog = True
     
-    st.button("⚙️ Manage Categories", use_container_width=True, on_click=open_cat_dialog)
+    st.button("⚙️ Categories", use_container_width=True, on_click=open_cat_dialog)
 
     if st.session_state.show_cat_dialog:
         manage_categories_dialog()
