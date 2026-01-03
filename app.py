@@ -28,7 +28,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 # Added start_epoch for persistence, formatted_time for readability
-REQUIRED_COLUMNS = ['name', 'category', 'formatted_time', 'status', 'start_epoch']
+REQUIRED_COLUMNS = ['name', 'category', 'formatted_time', 'status', 'start_epoch', 'notes']
 
 # Helper: Format seconds to HH:MM:SS
 def format_time(seconds):
@@ -320,20 +320,21 @@ if not st.session_state.tasks:
     st.info("No tasks found. Add one to start tracking!")
 else:
     # Header row (Added Category column)
-    # Col widths: Index, Name, Category, Status, Duration, Action, Del
-    cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5])
+    # Col widths: Index, Name, Category, Status, Duration, Action, Note, Del
+    cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5, 0.5])
     cols[0].markdown("**#**")
     cols[1].markdown("**Task Name**")
     cols[2].markdown("**Category**")
     cols[3].markdown("**Status**")
     cols[4].markdown("**Duration**")
     cols[5].markdown("**Action**")
-    cols[6].markdown("**Del**")
+    cols[6].markdown("**Note**")
+    cols[7].markdown("**Del**")
 
     # Loop to render rows
     for idx, task in enumerate(st.session_state.tasks):
         with st.container():
-            cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5])
+            cols = st.columns([0.5, 3, 2, 1.5, 1.5, 1.0, 0.5, 0.5])
             
             # Index
             cols[0].text(f"{idx + 1}")
@@ -369,8 +370,22 @@ else:
             btn_type = "primary" if is_running else "secondary"
             cols[5].button(btn_label, key=f"btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True)
             
+            # Notes Button
+            cols[6].button("📝", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+            
             # Delete Button
-            cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_task, args=(idx,), use_container_width=True)
+            cols[7].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_task, args=(idx,), use_container_width=True)
+            
+            # Notes Area (Conditional)
+            if st.session_state.active_note_idx == idx:
+                st.text_area(
+                    "Notes", 
+                    value=task.get('notes', ''), 
+                    key=f"note_content_{idx}",
+                    on_change=update_notes,
+                    label_visibility="collapsed",
+                    placeholder="Add details here..."
+                )
             
     st.markdown("---")
 
