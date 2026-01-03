@@ -412,11 +412,13 @@ st.markdown("### My Tasks")
 
 # Filters
 with st.expander("🔎 Filters", expanded=False):
-    col_f1, col_f2 = st.columns([2, 2])
+    col_f1, col_f2, col_f3 = st.columns([2, 1.5, 1.5])
     with col_f1:
         search_query = st.text_input("Search (ID or Description)", placeholder="Type to search...").lower()
     with col_f2:
         filter_categories = st.multiselect("Filter by Category", CATEGORIES)
+    with col_f3:
+        filter_date = st.date_input("Filter by Date", value=None)
 
 # Task List Logic
 if not st.session_state.tasks:
@@ -436,8 +438,17 @@ else:
         match_cat = True
         if filter_categories:
             match_cat = t.get('category') in filter_categories
+        
+        # Match Date
+        match_date = True
+        if filter_date:
+            # Task date is "DD/MM/YYYY". Input is datetime.date (YYYY-MM-DD).
+            target_str = filter_date.strftime("%d/%m/%Y")
+            task_date = t.get('created_date', '')
+            if task_date != target_str:
+                match_date = False
             
-        if match_search and match_cat:
+        if match_search and match_cat and match_date:
             filtered_tasks.append((i, t))
 
     if not filtered_tasks:
