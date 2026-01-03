@@ -617,7 +617,8 @@ def edit_task_dialog(index):
 def add_task():
     task_id = st.session_state.get("new_task_id", "").strip()
     task_name = st.session_state.get("new_task_input", "").strip()
-    task_category = st.session_state.get("new_category_input", "") 
+    # Default category if none selected (since input removed)
+    task_category = "Otros" 
     
     if not task_id or not task_name:
         st.toast("⚠️ Please fill in ID and Description", icon="⚠️")
@@ -638,7 +639,7 @@ def add_task():
             'status': "To Do"
         })
         st.session_state.new_task_input = "" 
-        st.session_state.new_category_input = "" 
+        # st.session_state.new_category_input = "" # Removed
         st.session_state.new_task_id = "" # Clear ID
         save_tasks()
 
@@ -779,15 +780,13 @@ tab_tracker, tab_analytics, tab_logs = st.tabs(["⏱️ Tracker", "📊 Analytic
 
 with tab_tracker:
     # Input Section
-    # 4 columns: ID | Description | Category | Add
-    col0, col1, col2, col3 = st.columns([1, 3, 2, 1], vertical_alignment="bottom")
+    # 3 columns: ID | Description | Add
+    col0, col1, col2 = st.columns([1, 4, 1], vertical_alignment="bottom")
     with col0:
         st.text_input("ID", key="new_task_id", placeholder="ID")
     with col1:
         st.text_input("Description", key="new_task_input", placeholder="Enter task description...")
     with col2:
-        st.selectbox("Category", st.session_state.get('categories_list', DEFAULT_CATEGORIES), key="new_category_input")
-    with col3:
         st.button("Add", on_click=add_task, use_container_width=True)
 
     # Filters
