@@ -629,6 +629,14 @@ with st.sidebar:
     if st.session_state.show_cat_dialog:
         manage_categories_dialog()
         
+    # Database Link
+    secrets = find_credentials(st.secrets)
+    url = secrets.get("spreadsheet") if secrets else None
+    if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+    
+    if url:
+        st.link_button("📂 DDBB", url, use_container_width=True)
+        
     # Logout (Bottom)
     if st.button("🔒 Logout", key="logout_btn", use_container_width=True):
         logout()
