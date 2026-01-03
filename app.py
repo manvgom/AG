@@ -21,7 +21,7 @@ def check_login():
 
 def logout():
     st.session_state.authenticated = False
-    st.rerun()
+    st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
     # Check if password is configured
@@ -432,7 +432,6 @@ def toggle_timer(index):
         st.session_state.tasks[index]['start_epoch'] = current_time
     
     save_tasks()
-    st.rerun() 
         
 
 
