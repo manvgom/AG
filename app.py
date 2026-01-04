@@ -250,6 +250,41 @@ def remove_category(cat_name):
         except Exception as e:
             st.warning(f"Error removing category: {e}")
 
+def update_category(old_name, new_name, new_desc):
+    """Update a category name and description, propagating to tasks."""
+    if 'categories_list' not in st.session_state: load_categories()
+    
+    # 1. Update List
+    if old_name in st.session_state.categories_list:
+        idx = st.session_state.categories_list.index(old_name)
+        st.session_state.categories_list[idx] = new_name
+    else:
+        # Fallback if somehow missing
+        st.session_state.categories_list.append(new_name)
+        
+    # 2. Update Description
+    if 'categories_desc' not in st.session_state: st.session_state.categories_desc = {}
+    # Remove old desc if key changed
+    if old_name != new_name and old_name in st.session_state.categories_desc:
+        del st.session_state.categories_desc[old_name]
+    st.session_state.categories_desc[new_name] = new_desc
+    
+    # 3. Propagate to Tasks
+    # We iterate all tasks and update category if it matches old_name
+    updated_tasks = False
+    if st.session_state.tasks:
+        for t in st.session_state.tasks:
+            if t.get('category') == old_name:
+                t['category'] = new_name
+                updated_tasks = True
+    
+    # 4. Save
+    save_categories()
+    if updated_tasks:
+        save_tasks()
+    
+    st.toast(f"✅ Category updated: {old_name} -> {new_name}", icon="✨")
+
 def ensure_logs_loaded():
     """Ensure logs_data is loaded in session state."""
     if "logs_data" not in st.session_state or st.session_state.logs_data is None:
@@ -770,13 +805,43 @@ def toggle_timer(index):
 def manage_categories_dialog():
     st.write("Add or remove categories below.")
     
-    new_cat = st.text_input("New Category Name", placeholder="e.g. Design, Meeting...", key="dialog_new_cat")
-    new_desc = st.text_area("Description (Optional)", placeholder="Context about this category...", key="dialog_new_desc")
+    # EDIT MODE HANDLING
+    edit_target = st.session_state.get("cat_edit_target", None)
     
-    if st.button("Add Category", type="primary", use_container_width=True):
-        if new_cat:
-            add_category(new_cat, new_desc)
-            st.rerun()
+    if edit_target:
+        st.info(f"✏️ Editing: **{edit_target}**")
+        # Pre-fill (Session state persistence for inputs needs manual key handling or value=...)
+        # Streamlit resets widgets on rerun if key is same but code changed? 
+        # Better to rely on separate keys for edit mode or shared keys initialized?
+        # Let's use value=... and keys specific to edit to avoid conflict? Or shared.
+        
+        # Get current desc
+        current_desc = st.session_state.get('categories_desc', {}).get(edit_target, "")
+        
+        new_cat = st.text_input("Category Name", value=edit_target, key="dialog_edit_cat")
+        new_desc = st.text_area("Description (Optional)", value=current_desc, key="dialog_edit_desc")
+        
+        c_up, c_cancel = st.columns([1, 1])
+        with c_up:
+            if st.button("Update", type="primary", use_container_width=True):
+                if new_cat:
+                    update_category(edit_target, new_cat, new_desc)
+                    st.session_state.cat_edit_target = None # Exit edit mode
+                    st.rerun()
+        with c_cancel:
+             if st.button("Cancel", use_container_width=True):
+                 st.session_state.cat_edit_target = None
+                 st.rerun()
+                 
+    else:
+        # ADD MODE
+        new_cat = st.text_input("New Category Name", placeholder="e.g. Design, Meeting...", key="dialog_new_cat")
+        new_desc = st.text_area("Description (Optional)", placeholder="Context about this category...", key="dialog_new_desc")
+        
+        if st.button("Add Category", type="primary", use_container_width=True):
+            if new_cat:
+                add_category(new_cat, new_desc)
+                st.rerun()
             
     st.markdown("---")
     st.markdown("##### Current Categories")
@@ -790,13 +855,19 @@ def manage_categories_dialog():
         for cat in st.session_state.categories_list:
             desc = st.session_state.categories_desc.get(cat, "")
             
-            c1, c2 = st.columns([4, 1], vertical_alignment="center")
+            c1, c2, c3 = st.columns([3.5, 0.75, 0.75], vertical_alignment="center")
             if desc:
                 c1.markdown(f"**{cat}**<br><span style='color:grey; font-size:0.8em;'>{desc}</span>", unsafe_allow_html=True)
             else:
                 c1.text(cat)
+            
+            # Edit Button
+            if c2.button("✏️", key=f"edit_cat_dialog_{cat}"):
+                st.session_state.cat_edit_target = cat
+                st.rerun()
                 
-            if c2.button("🗑️", key=f"rm_cat_dialog_{cat}"):
+            # Delete Button
+            if c3.button("🗑️", key=f"rm_cat_dialog_{cat}"):
                 remove_category(cat)
                 st.rerun()
     
