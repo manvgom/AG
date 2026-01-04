@@ -1112,11 +1112,13 @@ with tab_analytics:
             st.subheader("📅 Daily Activity Trend")
             daily_agg = df_log.groupby('Date')['Hours'].sum().reset_index()
             daily_agg['DateStr'] = daily_agg['Date'].astype(str)
+            # Add HH:MM:SS string
+            daily_agg['DurationStr'] = (daily_agg['Hours'] * 3600).apply(format_time)
             
             chart_daily = alt.Chart(daily_agg).mark_bar().encode(
                 x=alt.X('DateStr', title='Date'),
                 y=alt.Y('Hours', title='Total Hours'),
-                tooltip=['DateStr', alt.Tooltip('Hours', format='.2f')],
+                tooltip=['DateStr', alt.Tooltip('DurationStr', title='Time')],
                 color=alt.value("#4C78A8")
             ).properties(height=300)
             
@@ -1129,11 +1131,12 @@ with tab_analytics:
             st.subheader("🔥 Peak Productivity Hours")
             # Group by Hour (0-23)
             hourly_agg = df_log.groupby('Hour')['Hours'].sum().reset_index()
+            hourly_agg['DurationStr'] = (hourly_agg['Hours'] * 3600).apply(format_time)
             
             chart_hourly = alt.Chart(hourly_agg).mark_bar(color="#ff9f43").encode(
                 x=alt.X('Hour', title='Hour of Day (0-23)', scale=alt.Scale(domain=[0, 23])),
                 y=alt.Y('Hours', title='Total Hours Worked'),
-                tooltip=['Hour', alt.Tooltip('Hours', format='.2f')]
+                tooltip=['Hour', alt.Tooltip('DurationStr', title='Time')]
             ).properties(height=250)
             
             st.altair_chart(chart_hourly, use_container_width=True)
@@ -1145,15 +1148,16 @@ with tab_analytics:
             st.subheader("📊 Time Distribution by Category")
             cat_agg = df_log.groupby('Categoría')['Hours'].sum().reset_index()
             cat_agg = cat_agg.sort_values('Hours', ascending=False)
+            cat_agg['DurationStr'] = (cat_agg['Hours'] * 3600).apply(format_time)
             
             base = alt.Chart(cat_agg).encode(theta=alt.Theta("Hours", stack=True))
             pie = base.mark_arc(outerRadius=120).encode(
                 color=alt.Color("Categoría"),
                 order=alt.Order("Hours", sort="descending"),
-                tooltip=["Categoría", alt.Tooltip("Hours", format='.2f')]
+                tooltip=["Categoría", alt.Tooltip("DurationStr", title='Time')]
             )
             text = base.mark_text(radius=140).encode(
-                text=alt.Text("Hours", format=".1f"),
+                text=alt.Text("DurationStr"),
                 order=alt.Order("Hours", sort="descending"),
                 color=alt.value("white")  
             )
