@@ -248,7 +248,7 @@ def remove_category(cat_name):
         # Persist (Overwrite list)
         save_categories()
         st.toast(f"Category '{cat_name}' removed!", icon="🗑️")
-            st.warning(f"Error removing category: {e}")
+
 
 def update_category(old_name, new_name, new_desc):
     """Update a category name and description, propagating to tasks."""
