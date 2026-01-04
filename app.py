@@ -871,9 +871,7 @@ def manage_categories_dialog():
                 remove_category(cat)
                 st.rerun()
     
-    if st.button("Close", key="close_cat_dialog"):
-        st.session_state.show_cat_dialog = False
-        st.rerun()
+    # Close button removed as per request (Dialog has built-in close)
 
 
 # Sidebar Logout & Settings
