@@ -644,6 +644,42 @@ def edit_task_dialog(index):
         save_tasks()
         st.rerun()
 
+@st.dialog("📦 Archive Project")
+def archive_confirmation(group_id, group_name):
+    st.write(f"Archive project **{group_id} - {group_name}**?")
+    st.info("This will move ALL tasks in this group to 'Archived'.")
+    
+    if st.button("Yes, Archive", type="primary", use_container_width=True):
+        current_date_str = datetime.now().strftime("%d/%m/%Y")
+        
+        # Iterate all tasks and archive matching ones in session state
+        for t in st.session_state.tasks:
+            t_id = t.get('id', '').strip()
+            t_name = t.get('name', '').strip()
+            
+            if t_id == group_id and t_name == group_name:
+                t['archived'] = True
+                t['completion_date'] = current_date_str
+                
+        # Handle active task reset if it belonged to this group
+        if st.session_state.active_task_idx is not None:
+             active_t = st.session_state.tasks[st.session_state.active_task_idx]
+             if active_t.get('archived', False):
+                 st.session_state.active_task_idx = None
+                 st.session_state.start_time = None
+                 
+        save_tasks()
+        st.rerun()
+
+def unarchive_group(group_id, group_name):
+    for t in st.session_state.tasks:
+        if t.get('id', '').strip() == group_id and t.get('name', '').strip() == group_name:
+            t['archived'] = False
+            t['completion_date'] = ""
+            
+    save_tasks()
+    st.rerun()
+
 def add_task():
     task_id = st.session_state.get("new_task_id", "").strip()
     task_name = st.session_state.get("new_task_input", "").strip()
