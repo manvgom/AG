@@ -60,8 +60,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
-# Added start_epoch for persistence, formatted_time for readability
-REQUIRED_COLUMNS = ['id', 'name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date', 'status']
+# Added start_epoch for persistence, formatted_time for readability, archived/completion_date for lifecycle
+REQUIRED_COLUMNS = ['id', 'name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date', 'status', 'archived', 'completion_date']
 
 DEFAULT_CATEGORIES = [
     "Gestión de la demanda",
