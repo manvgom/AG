@@ -464,7 +464,7 @@ def notes_dialog(index):
         st.session_state[f"note_temp_{index}"] = task.get('notes', '')
         
     def insert_timestamp():
-        now_str = datetime.now().strftime("[%d/%m/%Y %H:%M]")
+        now_str = datetime.now().strftime("[%d/%m/%Y %H:%M:%S]")
         current_text = st.session_state.get(f"note_temp_{index}", "")
         if current_text:
             new_text = f"{current_text}\n\n{now_str}: "
