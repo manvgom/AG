@@ -361,10 +361,13 @@ def load_tasks():
                 'name': str(row.get('name', '')),
                 'category': str(row.get('category', '')),
                 'total_seconds': total_sec,
-                'status': status,
+                # 'status' is kept for backward compat in CSV but we don't display it anymore
+                'status': status, 
                 'start_epoch': start_ep,
                 'notes': str(row.get('notes', '')),
-                'created_date': str(row.get('created_date', ''))
+                'created_date': str(row.get('created_date', '')),
+                'archived': str(row.get('archived', 'False')).lower() == 'true',
+                'completion_date': str(row.get('completion_date', ''))
             }
             validated_data.append(clean_row)
         
@@ -423,7 +426,9 @@ def save_tasks():
                 task.get('start_epoch', 0.0), 
                 task.get('notes', ''),
                 task.get('created_date', ''),
-                task.get('status', 'To Do')
+                task.get('status', 'To Do'),
+                str(task.get('archived', False)),
+                task.get('completion_date', '')
             ]
             values.append(row)
             
