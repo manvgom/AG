@@ -1127,23 +1127,121 @@ with tab_analytics:
             st.warning("No data for selected period.")
         else:
             # -------------------------------------------------------
-            # Row 1: Daily Activity Trend (Bar Chart)
+            # 1. KPIs Section
             # -------------------------------------------------------
-            st.subheader("📅 Daily Activity Trend")
-            daily_agg = df_log.groupby('Date')['Hours'].sum().reset_index()
-            daily_agg['DateStr'] = daily_agg['Date'].astype(str)
-            # Add HH:MM:SS string
-            daily_agg['DurationStr'] = (daily_agg['Hours'] * 3600).apply(format_time)
+            st.markdown("### 🚀 Performance Pulse")
             
-            chart_daily = alt.Chart(daily_agg).mark_bar().encode(
-                x=alt.X('DateStr', title='Date'),
-                y=alt.Y('Hours', title='Total Hours'),
-                tooltip=['DateStr', alt.Tooltip('DurationStr', title='Time')],
-                color=alt.value("#4C78A8")
-            ).properties(height=300)
+            # A. Total Time
+            total_hours = df_log['Hours'].sum()
             
-            st.altair_chart(chart_daily, use_container_width=True)
+            # B. Velocity (Comparison to previous period)
+            # If date_range is set, use that duration. Else default 7 days.
+            if date_range and len(date_range) == 2:
+                s, e = date_range
+                delta = (e - s).days + 1
+                prev_s = s - pd.Timedelta(days=delta)
+                prev_e = s - pd.Timedelta(days=1)
+            else:
+                 # Default comparison: This week so far vs Last week same days? 
+                 # Or just Last 7 Days vs Previous 7 Days
+                 # Let's use Last 7 Days relative to Today for simplicity if no filter
+                 delta = 7
+                 today = datetime.now().date()
+                 s = today - pd.Timedelta(days=6)
+                 prev_s = s - pd.Timedelta(days=7)
+                 prev_e = s - pd.Timedelta(days=1)
+            
+            # We need the FULL dataset to calculate previous period, ignoring current filters?
+            # Actually, we should probably check if 'df_log' is already filtered. 
+            # If filtered, we can't get previous data from it.
+            # We need 'st.session_state.logs_data' again for "Previous".
+            full_df = st.session_state.logs_data.copy()
+            full_df['Seconds'] = full_df['Tiempo'].apply(parse_dur)
+            full_df['Hours'] = full_df['Seconds'] / 3600.0
+            full_df['StartDT'] = pd.to_datetime(full_df['Fecha Inicio'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+            full_df['Date'] = full_df['StartDT'].dt.date
+            
+            prev_mask = (full_df['Date'] >= prev_s) & (full_df['Date'] <= prev_e)
+            prev_hours = full_df.loc[prev_mask, 'Hours'].sum()
+            
+            delta_val = total_hours - prev_hours
+            delta_pct = (delta_val / prev_hours * 100) if prev_hours > 0 else 100 if total_hours > 0 else 0
+            
+            # C. Top Category
+            if not df_log.empty:
+                top_cat_s = df_log.groupby('Categoría')['Hours'].sum()
+                if not top_cat_s.empty:
+                    top_cat = top_cat_s.idxmax()
+                    top_cat_val = top_cat_s.max()
+                else:
+                    top_cat = "-"
+                    top_cat_val = 0
+            else:
+                top_cat = "-"
+                top_cat_val = 0
+            
+            # D. Streak (Consecutive days ending today/yesterday)
+            # We look at ALL data for streak, not just filtered
+            unique_dates = sorted(list(set(full_df['Date'].dropna())), reverse=True)
+            streak = 0
+            check_date = datetime.now().date()
+            
+            # Allow streak to continue if today is empty but yesterday wasn't
+            if unique_dates and unique_dates[0] < check_date:
+                 if unique_dates[0] == check_date - pd.Timedelta(days=1):
+                     check_date = unique_dates[0] # Start counting from yesterday
+                 elif unique_dates[0] == check_date:
+                     pass # Logged today
+                 else:
+                     check_date = None # Streak broken
+            
+            if check_date:
+                for d in unique_dates:
+                    if d == check_date:
+                        streak += 1
+                        check_date -= pd.Timedelta(days=1)
+                    else:
+                        break
+            
+            # Render KPIs
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("Total Focus Time", format_time(total_hours * 3600), delta=f"{delta_pct:.1f}%")
+            k2.metric("Velocity (vs Prev)", format_time(delta_val * 3600)) # Alternative delta
+            k3.metric("Day Streak", f"{streak} days", "🔥 Keep it up!" if streak > 2 else None)
+            k4.metric("Top Focus", top_cat, format_time(top_cat_val * 3600))
+            
             st.markdown("---")
+
+            # -------------------------------------------------------
+            # 2. Consistency Grid (Calendar Heatmap)
+            # -------------------------------------------------------
+            st.subheader("🗓️ Consistency Grid")
+            
+            # Data prep: Sum hours per day
+            # We use full_df or df_log? If user drills down, grid should probably reflect selection.
+            # But the 'Consistency' argument usually implies 'All Activity'. 
+            # Let's stick to df_log (filtered) to allow drilling down "When did I work on Project X?".
+            
+            cal_agg = df_log.groupby('Date')['Hours'].sum().reset_index()
+            cal_agg['DurationStr'] = (cal_agg['Hours'] * 3600).apply(format_time)
+            
+            # Altair Heatmap: X=Week, Y=DayOfWeek
+            chart_cal = alt.Chart(cal_agg).mark_rect(stroke="white").encode(
+                x=alt.X('yearweek(Date):O', title='Week'),
+                y=alt.Y('day(Date):O', title='Day'),
+                color=alt.Color('Hours', scale=alt.Scale(scheme='greens'), title='Hours'),
+                tooltip=[
+                    alt.Tooltip('Date', title='Date'),
+                    alt.Tooltip('DurationStr', title='Time')
+                ]
+            ).properties(height=150)
+            
+            st.altair_chart(chart_cal, use_container_width=True)
+            st.markdown("---")
+
+            # -------------------------------------------------------
+            # 3. Daily Activity Trend (Bar Chart)
+            # -------------------------------------------------------
 
             # -------------------------------------------------------
             # Row 2: Hourly Productivity Heatmap
