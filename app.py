@@ -771,18 +771,9 @@ with st.sidebar:
     # Category Management
     load_categories() # Ensure loaded
     
-    # Initialize dialog state
-    if 'show_cat_dialog' not in st.session_state:
-        st.session_state.show_cat_dialog = False
-        
-    def open_cat_dialog():
-        st.session_state.show_cat_dialog = True
-    
     # Categories Button (Primary Config)
-    st.button("⚙️ Categories", use_container_width=True, on_click=open_cat_dialog)
-
-    if st.session_state.show_cat_dialog:
-        manage_categories_dialog()
+    # Using on_click directly with the dialog function handles the state automatically
+    st.button("⚙️ Categories", use_container_width=True, on_click=manage_categories_dialog)
         
     # Database Link
     secrets = find_credentials(st.secrets)
