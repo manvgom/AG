@@ -884,8 +884,9 @@ with st.sidebar:
     load_categories() # Ensure loaded
     
     # Categories Button (Primary Config)
-    # Using on_click directly with the dialog function handles the state automatically
-    st.button("⚙️ Categories", use_container_width=True, on_click=manage_categories_dialog)
+    # Using state-based dialog to prevent closing on updates
+    if st.button("⚙️ Categories", use_container_width=True):
+        manage_categories_dialog()
         
     # Database Link
     secrets = find_credentials(st.secrets)
