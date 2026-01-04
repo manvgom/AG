@@ -821,13 +821,12 @@ def manage_categories_dialog():
         new_cat = st.text_input("Category Name", value=edit_target, key="dialog_edit_cat")
         new_desc = st.text_area("Description (Optional)", value=current_desc, key="dialog_edit_desc")
         
-        c_up, c_cancel = st.columns([1, 1])
         with c_up:
             if st.button("Update", type="primary", use_container_width=True):
                 if new_cat:
                     update_category(edit_target, new_cat, new_desc)
                     st.session_state.cat_edit_target = None # Exit edit mode
-                    st.rerun()
+                    st.rerun() # Force rerun to switch back to list view inside fragment
         with c_cancel:
              if st.button("Cancel", use_container_width=True):
                  st.session_state.cat_edit_target = None
@@ -841,7 +840,7 @@ def manage_categories_dialog():
         if st.button("Add Category", type="primary", use_container_width=True):
             if new_cat:
                 add_category(new_cat, new_desc)
-                st.rerun()
+                # Fragment auto-reruns on interaction, manual rerun not needed for dialog update
             
     st.markdown("---")
     st.markdown("##### Current Categories")
@@ -869,7 +868,6 @@ def manage_categories_dialog():
             # Delete Button
             if c3.button("🗑️", key=f"rm_cat_dialog_{cat}"):
                 remove_category(cat)
-                st.rerun()
     
     # Close button removed as per request (Dialog has built-in close)
 
