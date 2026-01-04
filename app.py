@@ -1261,25 +1261,57 @@ with tab_analytics:
             st.markdown("---")
 
             # -------------------------------------------------------
-            # Row 3: Category Distribution
+            # 4. Time River (Category -> Project Flow)
             # -------------------------------------------------------
-            st.subheader("📊 Time Distribution by Category")
-            cat_agg = df_log.groupby('Categoría')['Hours'].sum().reset_index()
-            cat_agg = cat_agg.sort_values('Hours', ascending=False)
-            cat_agg['DurationStr'] = (cat_agg['Hours'] * 3600).apply(format_time)
+            st.subheader("🌊 Time River (Context Breakdown)")
             
-            base = alt.Chart(cat_agg).encode(theta=alt.Theta("Hours", stack=True))
-            pie = base.mark_arc(outerRadius=120).encode(
-                color=alt.Color("Categoría"),
-                order=alt.Order("Hours", sort="descending"),
-                tooltip=["Categoría", alt.Tooltip("DurationStr", title='Time')]
+            # Group by Category AND Project (ID + Desc)
+            river_agg = df_log.groupby(['Categoría', 'ID', 'Descripción'])['Hours'].sum().reset_index()
+            river_agg['Project'] = river_agg['ID'] + ": " + river_agg['Descripción']
+            river_agg['DurationStr'] = (river_agg['Hours'] * 3600).apply(format_time)
+            
+            # Stacked Bar: X=Hours, Y=Category, Color=Project
+            chart_river = alt.Chart(river_agg).mark_bar().encode(
+                x=alt.X('Hours', title='Total Hours', stack='zero'),
+                y=alt.Y('Categoría', title='Category'),
+                color=alt.Color('Project', title='Project', legend=alt.Legend(orient="bottom", columns=3)),
+                tooltip=[
+                    alt.Tooltip('Categoría', title='Category'),
+                    alt.Tooltip('Project', title='Project'),
+                    alt.Tooltip('DurationStr', title='Time')
+                ]
+            ).properties(height=350)
+            
+            st.altair_chart(chart_river, use_container_width=True)
+            st.markdown("---")
+            
+            # -------------------------------------------------------
+            # 5. Deep Dive: Project Leaderboard
+            # -------------------------------------------------------
+            st.subheader("🏆 Project Leaderboard")
+            
+            proj_lead = df_log.groupby(['ID', 'Descripción', 'Categoría'])['Hours'].sum().reset_index()
+            total_h = proj_lead['Hours'].sum()
+            proj_lead['% Total'] = (proj_lead['Hours'] / total_h)
+            proj_lead['Duration'] = (proj_lead['Hours'] * 3600).apply(format_time)
+            
+            proj_lead = proj_lead.sort_values('Hours', ascending=False).reset_index(drop=True)
+            
+            # Display as interactive dataframe with Progress Column
+            st.dataframe(
+                proj_lead[['ID', 'Descripción', 'Categoría', 'Duration', '% Total']],
+                column_config={
+                    "% Total": st.column_config.ProgressColumn(
+                        "Impact",
+                        format="%.1f%%",
+                        min_value=0,
+                        max_value=1,
+                    ),
+                    "Duration": st.column_config.TextColumn("Time Logged"),
+                },
+                use_container_width=True,
+                hide_index=True
             )
-            text = base.mark_text(radius=140).encode(
-                text=alt.Text("DurationStr"),
-                order=alt.Order("Hours", sort="descending"),
-                color=alt.value("white")  
-            )
-            st.altair_chart(pie + text, use_container_width=True)
 
 
 
