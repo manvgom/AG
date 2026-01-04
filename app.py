@@ -856,7 +856,16 @@ with tab_tracker:
         with col_f3:
             filter_date = st.date_input("Filter by Date Range", value=[], help="Select a range")
         
-        show_archived = st.checkbox("Show Archived Projects", value=False)
+        # Calculate unique archived groups count
+        archived_groups_count = 0
+        if st.session_state.tasks:
+             arch_pairs = set()
+             for t in st.session_state.tasks:
+                 if t.get('archived', False):
+                     arch_pairs.add((t.get('id', '').strip(), t.get('name', '').strip()))
+             archived_groups_count = len(arch_pairs)
+        
+        show_archived = st.checkbox(f"Show Archived Projects [{archived_groups_count}]", value=False)
 
     # Task List Logic
     if not st.session_state.tasks:
@@ -957,92 +966,91 @@ with tab_tracker:
                 # Default open if filtered or running (but collapsed if archived)
                 is_expanded = ((len(groups) == 1) or running_in_group) and not show_archived
                 
-                # Header Layout: Text + Archive Button
-                # We can't put a button *inside* the expander label easily.
-                # Standard trick: Columns before the expander? No, content is inside.
-                # Columns AROUND the expander.
-                
-                c_exp, c_arch = st.columns([0.9, 0.1], vertical_alignment="center")
-                
-                with c_exp:
-                    with st.expander(header_str, expanded=is_expanded):
-                        # Header row for the group content
-                        # Col widths: Category, Date, Duration, Action, Edit, Note, Del
-                        h_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
-                        h_cols[0].markdown("**Category**")
-                        h_cols[1].markdown("**Date**")
-                        h_cols[2].markdown("**Duration**")
+                with st.expander(header_str, expanded=is_expanded):
+                    # Header row for the group content
+                    # Col widths: Category, Date, Duration, Action, Edit, Note, Del
+                    h_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                    h_cols[0].markdown("**Category**")
+                    h_cols[1].markdown("**Date**")
+                    h_cols[2].markdown("**Duration**")
+                    
+                    for idx, task in g_tasks:
+                        r_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
-                        for idx, task in g_tasks:
-                            r_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                        # Category
+                        cat_name = task.get('category', '')
+                        cat_desc = st.session_state.get('categories_desc', {}).get(cat_name, "")
+                        if cat_desc:
+                             r_cols[0].markdown(f"{cat_name}<br><span style='color:grey; font-size:0.8em;'>{cat_desc}</span>", unsafe_allow_html=True)
+                        else:
+                             r_cols[0].text(cat_name)
+                        # Date
+                        r_cols[1].text(task.get('created_date', '-'))
+                        
+                        is_running = (idx == st.session_state.active_task_idx)
+                        
+                        # Duration Calculation
+                        try:
+                            raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
+                            current_total = float(raw_val)
+                        except:
+                            current_total = 0.0
+                        
+                        if is_running:
+                            start_t = st.session_state.start_time or time.time()
+                            current_total += (time.time() - start_t)
+                        
+                        dur_str = format_time(current_total)
+                        if is_running:
+                             r_cols[2].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                        else:
+                             r_cols[2].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
+                        
+                        # Buttons
+                        btn_label = "⏹️" if is_running else "▶️"
+                        btn_type = "primary" if is_running else "secondary"
+                        # No more blocked button by status
+                        
+                        r_cols[3].button(
+                            btn_label, 
+                            key=f"btn_{idx}", 
+                            type=btn_type, 
+                            on_click=toggle_timer, 
+                            args=(idx,), 
+                            use_container_width=True,
+                            disabled=show_archived # Disable play if archived
+                        )
+                        
                             
-                            # Category
-                            cat_name = task.get('category', '')
-                            cat_desc = st.session_state.get('categories_desc', {}).get(cat_name, "")
-                            if cat_desc:
-                                 r_cols[0].markdown(f"{cat_name}<br><span style='color:grey; font-size:0.8em;'>{cat_desc}</span>", unsafe_allow_html=True)
-                            else:
-                                 r_cols[0].text(cat_name)
-                            # Date
-                            r_cols[1].text(task.get('created_date', '-'))
-                            
-                            is_running = (idx == st.session_state.active_task_idx)
-                            
-                            # Duration Calculation
-                            try:
-                                raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
-                                current_total = float(raw_val)
-                            except:
-                                current_total = 0.0
-                            
-                            if is_running:
-                                start_t = st.session_state.start_time or time.time()
-                                current_total += (time.time() - start_t)
-                            
-                            dur_str = format_time(current_total)
-                            if is_running:
-                                 r_cols[2].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
-                            else:
-                                 r_cols[2].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
-                            
-                            # Buttons
-                            btn_label = "⏹️" if is_running else "▶️"
-                            btn_type = "primary" if is_running else "secondary"
-                            # No more blocked button by status
-                            
-                            r_cols[3].button(
-                                btn_label, 
-                                key=f"btn_{idx}", 
-                                type=btn_type, 
-                                on_click=toggle_timer, 
-                                args=(idx,), 
-                                use_container_width=True,
-                                disabled=show_archived # Disable play if archived
-                            )
-                            
-                                
-                            if r_cols[4].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True, disabled=show_archived):
-                                pass
+                        if r_cols[4].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True, disabled=show_archived):
+                            pass
 
-                            # Notes Button - Dynamic Icon
-                            has_notes = bool(task.get('notes', '').strip())
-                            note_icon = "📝" if has_notes else "📄"
-                            
-                            r_cols[5].button(note_icon, key=f"note_btn_{idx}", on_click=notes_dialog, args=(idx,), use_container_width=True)
-                            
-                            if r_cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
-                                pass
+                        # Notes Button - Dynamic Icon
+                        has_notes = bool(task.get('notes', '').strip())
+                        note_icon = "📝" if has_notes else "📄"
                         
+                        r_cols[5].button(note_icon, key=f"note_btn_{idx}", on_click=notes_dialog, args=(idx,), use_container_width=True)
+                        
+                        if r_cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                            pass
+                    
+                    st.write("") # Spacer
+                    
+                    # Footer: Left = Add Category, Right = Archive
+                    f_col1, f_col2 = st.columns([1, 1], vertical_alignment="bottom")
+                    
+                    with f_col1:
                         if not show_archived:
-                            st.write("") # Spacer
-                            if st.button(f"➕ Add Category to {g_id}", key=f"add_sibling_{g_id}_{g_name}"):
+                            if st.button(f"➕ Add Category", key=f"add_sibling_{g_id}_{g_name}"):
                                 add_sibling_task_dialog(g_id, g_name)
-                                
-                with c_arch:
-                    if show_archived:
-                         st.button("📂", key=f"unarch_{g_id}_{g_name}", help="Unarchive Project", on_click=unarchive_group, args=(g_id, g_name))
-                    else:
-                         st.button("📦", key=f"arch_{g_id}_{g_name}", help="Archive Project", on_click=archive_confirmation, args=(g_id, g_name))
+                    
+                    with f_col2:
+                        # Use container to align right? Streamlit columns justify content left by default.
+                        # We can just put it in the second column.
+                        if show_archived:
+                             st.button("📂 Unarchive Project", key=f"unarch_{g_id}_{g_name}", on_click=unarchive_group, args=(g_id, g_name), use_container_width=True)
+                        else:
+                             st.button("📦 Archive Project", key=f"arch_{g_id}_{g_name}", on_click=archive_confirmation, args=(g_id, g_name), use_container_width=True)
                 
         st.markdown("---")
 
