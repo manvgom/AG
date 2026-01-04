@@ -1092,9 +1092,18 @@ with tab_analytics:
         df_log['Hour'] = df_log['StartDT'].dt.hour
         
         # Filter Logic
-        col_ctrl, _ = st.columns([1, 2])
-        with col_ctrl:
-            date_range = st.date_input("Filter Analytics by Date Range", value=[], key="video_analytics_range")
+        c_f1, c_f2, c_f3 = st.columns([1.5, 1.5, 2])
+        
+        with c_f1:
+             date_range = st.date_input("📅 Date Range", value=[], key="video_analytics_range")
+             
+        with c_f2:
+             # Load Categories for multiselect
+             all_cats = sorted(list(set(df_log['Categoría'].dropna())))
+             sel_cats = st.multiselect("🏷️ Category", all_cats, key="an_cat_filter")
+             
+        with c_f3:
+             search_txt = st.text_input("🔍 Search Task (ID/Desc)", key="an_search_filter").lower()
             
         if date_range:
             if len(date_range) == 2:
@@ -1102,6 +1111,17 @@ with tab_analytics:
                 df_log = df_log[(df_log['Date'] >= s) & (df_log['Date'] <= e)]
             elif len(date_range) == 1:
                 df_log = df_log[df_log['Date'] == date_range[0]]
+                
+        if sel_cats:
+            df_log = df_log[df_log['Categoría'].isin(sel_cats)]
+            
+        if search_txt:
+            # Match ID or Description
+            # Column headers were: ID, Descripción, ...
+            df_log = df_log[
+                df_log['ID'].astype(str).str.lower().str.contains(search_txt) | 
+                df_log['Descripción'].astype(str).str.lower().str.contains(search_txt)
+            ]
                 
         if df_log.empty:
             st.warning("No data for selected period.")
