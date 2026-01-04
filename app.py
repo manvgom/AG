@@ -450,24 +450,49 @@ if 'confirm_delete_idx' not in st.session_state:
 if 'active_note_idx' not in st.session_state:
     st.session_state.active_note_idx = None
 
-def toggle_notes(index):
-    # If closing, save manually to ensure latest change is captured
-    if st.session_state.active_note_idx == index:
-        key = f"note_content_{index}"
-        if key in st.session_state:
-            st.session_state.tasks[index]['notes'] = st.session_state[key]
-            save_tasks()
-        st.session_state.active_note_idx = None
-    else:
-        st.session_state.active_note_idx = index
-
-def update_notes():
-    idx = st.session_state.active_note_idx
-    if idx is not None:
-        key = f"note_content_{idx}"
-        if key in st.session_state:
-            st.session_state.tasks[idx]['notes'] = st.session_state[key]
-            save_tasks()
+@st.dialog("📝 Task Notes")
+def notes_dialog(index):
+    task = st.session_state.tasks[index]
+    st.markdown(f"**Task:** {task.get('name', 'Unknown')}")
+    
+    # Text Area
+    # We use a key that doesn't conflict with main state to allow "Save" logic
+    # Actually, st.dialog reruns are tricky. We want to act on button press.
+    
+    # Initial load
+    if f"note_temp_{index}" not in st.session_state:
+        st.session_state[f"note_temp_{index}"] = task.get('notes', '')
+        
+    def insert_timestamp():
+        now_str = datetime.now().strftime("[%d/%m/%Y %H:%M]")
+        current_text = st.session_state.get(f"note_temp_{index}", "")
+        if current_text:
+            new_text = f"{current_text}\n\n{now_str}: "
+        else:
+            new_text = f"{now_str}: "
+        st.session_state[f"note_temp_{index}"] = new_text
+        
+    # Timestamp Button
+    if st.button("📅 Add Timestamp", key=f"ts_btn_{index}"):
+        insert_timestamp()
+        
+    # Text Input
+    new_notes = st.text_area(
+        "Content",
+        value=st.session_state.get(f"note_temp_{index}", ""),
+        height=300,
+        key=f"note_temp_{index}",
+        placeholder="Type details, updates, or logs here..."
+    )
+    
+    if st.button("Save Notes", type="primary", use_container_width=True):
+        st.session_state.tasks[index]['notes'] = new_notes
+        # Clean temp key to avoid stale data next open? 
+        # Actually session state persists, so we should update it or clear it.
+        # Clearing it ensures next open pulls from 'tasks' again.
+        del st.session_state[f"note_temp_{index}"]
+        save_tasks()
+        st.rerun()
 
 @st.dialog("➕ Add New Category to Task")
 def add_sibling_task_dialog(task_id, task_name):
@@ -952,22 +977,14 @@ with tab_tracker:
                         if r_cols[4].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True):
                             pass
 
-                        r_cols[5].button("📄", key=f"note_btn_{idx}", on_click=toggle_notes, args=(idx,), use_container_width=True)
+                        # Notes Button - Dynamic Icon
+                        has_notes = bool(task.get('notes', '').strip())
+                        note_icon = "📝" if has_notes else "📄"
+                        
+                        r_cols[5].button(note_icon, key=f"note_btn_{idx}", on_click=notes_dialog, args=(idx,), use_container_width=True)
                         
                         if r_cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                             pass
-                            
-                        # Notes Area
-                        if st.session_state.active_note_idx == idx:
-                            st.markdown(f"**Notes for: {task.get('category', '')}**")
-                            st.text_area(
-                                "Notes", 
-                                value=task.get('notes', ''), 
-                                key=f"note_content_{idx}",
-                                on_change=update_notes,
-                                label_visibility="collapsed",
-                                placeholder="Details..."
-                            )
                     
                     st.write("") # Spacer
                     if st.button(f"➕ Add Category to {g_id}", key=f"add_sibling_{g_id}_{g_name}"):
