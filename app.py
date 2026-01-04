@@ -801,7 +801,7 @@ def toggle_timer(index):
 
 
 
-@st.dialog("⚙️ Manage Categories")
+@st.dialog("⚙️ Manage Categories", width="large")
 def manage_categories_dialog():
     st.write("Add or remove categories below.")
     
