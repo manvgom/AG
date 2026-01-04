@@ -61,15 +61,15 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 # Added start_epoch for persistence, formatted_time for readability, archived/completion_date for lifecycle
-REQUIRED_COLUMNS = ['id', 'name', 'category', 'formatted_time', 'start_epoch', 'notes', 'created_date', 'status', 'archived', 'completion_date']
+# Removed 'status' as per user request (Option A)
+# Updated to English Title Case Headers (Standardization)
+REQUIRED_COLUMNS = ['ID', 'Task', 'Category', 'Duration', 'Start Epoch', 'Notes', 'Date Created', 'Archived', 'Date Archived']
 
 DEFAULT_CATEGORIES = [
     "Gestión de la demanda",
     "Gestión de la planificación",
     "Otros"
 ]
-
-STATUS_OPTIONS = ["To Do", "Waiting", "Done"]
 
 # Helper: Format seconds to HH:MM:SS
 def format_time(seconds):
@@ -303,23 +303,28 @@ def ensure_logs_loaded():
                     # ---------------------------------------------------------
                     # HEADER FIX / MIGRATION
                     # ---------------------------------------------------------
-                    NEW_HEADERS = ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
+                    # Old: ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
+                    # New: ["ID", "Task", "Category", "Start Time", "End Time", "Duration"]
+                    NEW_HEADERS = ["ID", "Task", "Category", "Start Time", "End Time", "Duration"]
                     need_header_update = False
                     
                     if not data:
                         need_header_update = True
                     else:
                         current_headers = data[0]
-                        if len(current_headers) < 3 or current_headers[0] != "ID" or current_headers[1] != "Descripción":
+                        # Check if headers match new standard. If not (e.g. Spanish or lowercase), update.
+                        # Simple check: Is 2nd col "Task"?
+                        if len(current_headers) < 2 or current_headers[1] != "Task":
                             need_header_update = True
                     
                     if need_header_update:
                         if not data:
                             ws_logs.append_row(NEW_HEADERS)
                         else:
+                            # Update header row
                             ws_logs.update(range_name="A1:F1", values=[NEW_HEADERS])
                         data = ws_logs.get_all_values()
-                        st.toast("✅ Updated Logs Headers to new format.", icon="🛠️")
+                        st.toast("✅ Updated Logs Headers to standard English format.", icon="🛠️")
 
                     if data:
                         raw_headers = data[0]
@@ -368,15 +373,17 @@ def load_tasks():
         start_time_found = None
         
         for i, row in enumerate(data):
-            # SOURCE OF TRUTH: HH:MM:SS column ('formatted_time')
-            # We ignore 'total_seconds' from sheet to avoid the giant number bugs.
-            # We recalculate total_seconds from the clean string.
-            time_str = str(row.get('formatted_time', '00:00:00'))
+            # MIGRATION LOGIC: Try New Keys -> Fail over to Old Keys
+            
+            # Duration (Source of Truth)
+            # New: 'Duration', Old: 'formatted_time'
+            time_str = str(row.get('Duration') or row.get('formatted_time', '00:00:00'))
             total_sec = float(parse_time_str(time_str))
             
-            # Start Epoch Logic
+            # Start Epoch
+            # New: 'Start Epoch', Old: 'start_epoch'
             try:
-                raw_ep = str(row.get('start_epoch', 0.0) or 0.0).replace(',', '.')
+                raw_ep = str(row.get('Start Epoch') or row.get('start_epoch', 0.0) or 0.0).replace(',', '.')
                 start_ep = float(raw_ep)
             except:
                 start_ep = 0.0
@@ -386,23 +393,16 @@ def load_tasks():
                 active_idx_found = i
                 start_time_found = start_ep
             
-            # Status Logic
-            status = str(row.get('status', 'To Do'))
-            if status not in STATUS_OPTIONS:
-                status = "To Do"
-            
             clean_row = {
-                'id': str(row.get('id', '')),
-                'name': str(row.get('name', '')),
-                'category': str(row.get('category', '')),
+                'id': str(row.get('ID') or row.get('id', '')),
+                'name': str(row.get('Task') or row.get('name', '')),
+                'category': str(row.get('Category') or row.get('category', '')),
                 'total_seconds': total_sec,
-                # 'status' is kept for backward compat in CSV but we don't display it anymore
-                'status': status, 
                 'start_epoch': start_ep,
-                'notes': str(row.get('notes', '')),
-                'created_date': str(row.get('created_date', '')),
-                'archived': str(row.get('archived', 'False')).lower() == 'true',
-                'completion_date': str(row.get('completion_date', ''))
+                'notes': str(row.get('Notes') or row.get('notes', '')),
+                'created_date': str(row.get('Date Created') or row.get('created_date', '')),
+                'archived': str(row.get('Archived') or row.get('archived', 'False')).lower() == 'true',
+                'completion_date': str(row.get('Date Archived') or row.get('completion_date', ''))
             }
             validated_data.append(clean_row)
         
@@ -461,7 +461,7 @@ def save_tasks():
                 task.get('start_epoch', 0.0), 
                 task.get('notes', ''),
                 task.get('created_date', ''),
-                task.get('status', 'To Do'),
+                # task.get('status', 'To Do'), # Removed
                 str(task.get('archived', False)),
                 task.get('completion_date', '')
             ]
@@ -562,7 +562,7 @@ def add_sibling_task_dialog(task_id, task_name):
             'id': task_id,
             'name': task_name,
             'category': new_cat,
-            'status': 'To Do',
+            # 'status': 'To Do', # Removed
             'total_seconds': 0.0,
             'start_epoch': 0.0,
             'notes': '',
@@ -597,11 +597,11 @@ def log_session(task_id, task_name, category, elapsed_seconds, start_epoch, end_
             # New Headers
             ws_logs.append_row([
                 "ID", 
-                "Descripción", 
-                "Categoría", 
-                "Fecha Inicio", 
-                "Fecha Fin", 
-                "Tiempo"
+                "Task", 
+                "Category", 
+                "Start Time", 
+                "End Time", 
+                "Duration"
             ])
             
         # Format Timestamps: DD/MM/AAAA HH:MM:SS
@@ -657,7 +657,7 @@ def edit_task_dialog(index):
     task = st.session_state.tasks[index]
     
     new_id = st.text_input("ID", value=task.get('id', ''))
-    new_name = st.text_input("Description", value=task.get('name', ''))
+    new_name = st.text_input("Task", value=task.get('name', ''))
     
     # Category Selectbox
     current_cat = task.get('category', 'Otros')
@@ -736,8 +736,8 @@ def add_task():
             'total_seconds': 0,
             'start_epoch': 0.0,
             'notes': "",
-            'created_date': current_date,
-            'status': "To Do"
+            'created_date': current_date
+            # 'status': "To Do" # Removed
         })
         st.session_state.new_task_input = "" 
         # st.session_state.new_category_input = "" # Removed
@@ -746,19 +746,15 @@ def add_task():
 
 # Old delete helpers removed in favor of dialog logic
 
-def update_status(task_idx, new_status):
-    st.session_state.tasks[task_idx]['status'] = new_status
-    save_tasks()
-
 def toggle_timer(index):
     # Rule 1: One timer global
     if st.session_state.active_task_idx is not None and st.session_state.active_task_idx != index:
         st.toast("⚠️ Another timer is running! Stop it first.", icon="🚫")
         return
         
-    # Rule 2: Done means Done
-    if st.session_state.tasks[index].get('status') == 'Done':
-        st.toast("Task is marked as Done. Unable to start timer.", icon="✅")
+    # Rule 2: Archived tasks cannot start
+    if st.session_state.tasks[index].get('archived', False):
+        st.toast("🚫 Cannot start timer on archived task.", icon="🔒")
         return
 
     current_time = time.time()
@@ -912,7 +908,7 @@ with tab_tracker:
     with col0:
         st.text_input("ID", key="new_task_id", placeholder="ID")
     with col1:
-        st.text_input("Description", key="new_task_input", placeholder="Enter task description...")
+        st.text_input("Task", key="new_task_input", placeholder="Enter task name...")
     with col2:
         st.button("Add", on_click=add_task, use_container_width=True)
 
@@ -920,7 +916,7 @@ with tab_tracker:
     with st.expander("🔎 Filters", expanded=False):
         col_f1, col_f2, col_f3 = st.columns([2, 1.5, 1.5])
         with col_f1:
-            search_query = st.text_input("Search (ID or Description)", placeholder="Type to search...").lower()
+            search_query = st.text_input("Search (ID or Task)", placeholder="Type to search...").lower()
         with col_f2:
             filter_categories = st.multiselect("Filter by Category", st.session_state.get('categories_list', DEFAULT_CATEGORIES))
         with col_f3:
@@ -1039,13 +1035,16 @@ with tab_tracker:
                 with st.expander(header_str, expanded=is_expanded):
                     # Header row for the group content
                     # Col widths: Category, Date, Duration, Action, Edit, Note, Del
-                    h_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                    # Header row for the group content
+                    # Col widths: Category, Duration, Action, Edit, Note, Del
+                    # Previous was [2.5, 1.2, 1.5, ...]. Removed 1.2 (Date). Added to Category -> 3.7
+                    h_cols = st.columns([3.7, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                     h_cols[0].markdown("**Category**")
-                    h_cols[1].markdown("**Date**")
-                    h_cols[2].markdown("**Duration**")
+                    # h_cols[1] was Date
+                    h_cols[1].markdown("**Duration**")
                     
                     for idx, task in g_tasks:
-                        r_cols = st.columns([2.5, 1.2, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                        r_cols = st.columns([3.7, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
                         # Category
                         cat_name = task.get('category', '')
@@ -1054,8 +1053,9 @@ with tab_tracker:
                              r_cols[0].markdown(f"{cat_name}<br><span style='color:grey; font-size:0.8em;'>{cat_desc}</span>", unsafe_allow_html=True)
                         else:
                              r_cols[0].text(cat_name)
-                        # Date
-                        r_cols[1].text(task.get('created_date', '-'))
+                        
+                        # Date Removed
+                        # r_cols[1].text(task.get('created_date', '-'))
                         
                         is_running = (idx == st.session_state.active_task_idx)
                         
@@ -1072,16 +1072,16 @@ with tab_tracker:
                         
                         dur_str = format_time(current_total)
                         if is_running:
-                             r_cols[2].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
+                             r_cols[1].markdown(f"<span style='color:#28a745; font-weight:bold; font-family:monospace; font-size:1.1em;'>{dur_str}</span>", unsafe_allow_html=True)
                         else:
-                             r_cols[2].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
+                             r_cols[1].markdown(f"<span style='font-family:monospace;'>{dur_str}</span>", unsafe_allow_html=True)
                         
                         # Buttons
                         btn_label = "⏹️" if is_running else "▶️"
                         btn_type = "primary" if is_running else "secondary"
                         # No more blocked button by status
                         
-                        r_cols[3].button(
+                        r_cols[2].button(
                             btn_label, 
                             key=f"btn_{idx}", 
                             type=btn_type, 
@@ -1092,16 +1092,16 @@ with tab_tracker:
                         )
                         
                             
-                        if r_cols[4].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True, disabled=show_archived):
+                        if r_cols[3].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True, disabled=show_archived):
                             pass
 
                         # Notes Button - Dynamic Icon
                         has_notes = bool(task.get('notes', '').strip())
                         note_icon = "📝" if has_notes else "📄"
                         
-                        r_cols[5].button(note_icon, key=f"note_btn_{idx}", on_click=notes_dialog, args=(idx,), use_container_width=True)
+                        r_cols[4].button(note_icon, key=f"note_btn_{idx}", on_click=notes_dialog, args=(idx,), use_container_width=True)
                         
-                        if r_cols[6].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
+                        if r_cols[5].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
                             pass
                     
                     st.write("") # Spacer
@@ -1134,8 +1134,8 @@ with tab_analytics:
         # Process Data from LOGS (Not Tasks)
         df_log = st.session_state.logs_data.copy()
         
-        # Schema: ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
-        # Parse 'Tiempo' (HH:MM:SS) -> Seconds manually
+        # Schema: ["ID", "Task", "Category", "Start Time", "End Time", "Duration"]
+        # Parse 'Duration' (HH:MM:SS) -> Seconds manually
         def parse_dur(x):
             try:
                 parts = str(x).split(':')
@@ -1146,16 +1146,16 @@ with tab_analytics:
                 pass
             return 0.0
             
-        df_log['Seconds'] = df_log['Tiempo'].apply(parse_dur)
-        # df_log['Seconds'] = pd.to_numeric(df_log['Tiempo'], errors='coerce').fillna(0) # OLD: Failed because it's HH:MM:SS string
+        df_log['Seconds'] = df_log['Duration'].apply(parse_dur)
+        # df_log['Seconds'] = pd.to_numeric(df_log['Duration'], errors='coerce').fillna(0) # OLD: Failed because it's HH:MM:SS string
         
         df_log['Hours'] = df_log['Seconds'] / 3600.0
         
         # Convert Dates
         # Format in Sheet is "DD/MM/YYYY HH:MM:SS" from log_session
         
-        # Parse 'Fecha Inicio' to datetime
-        df_log['StartDT'] = pd.to_datetime(df_log['Fecha Inicio'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+        # Parse 'Start Time' to datetime
+        df_log['StartDT'] = pd.to_datetime(df_log['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
         # Fallback if format differs?
         
         df_log['Date'] = df_log['StartDT'].dt.date
@@ -1169,7 +1169,7 @@ with tab_analytics:
              
         with c_f2:
              # Load Categories for multiselect
-             all_cats = sorted(list(set(df_log['Categoría'].dropna())))
+             all_cats = sorted(list(set(df_log['Category'].dropna())))
              sel_cats = st.multiselect("🏷️ Category", all_cats, key="an_cat_filter")
              
         with c_f3:
@@ -1183,14 +1183,14 @@ with tab_analytics:
                 df_log = df_log[df_log['Date'] == date_range[0]]
                 
         if sel_cats:
-            df_log = df_log[df_log['Categoría'].isin(sel_cats)]
+            df_log = df_log[df_log['Category'].isin(sel_cats)]
             
         if search_txt:
-            # Match ID or Description
-            # Column headers were: ID, Descripción, ...
+            # Match ID or Task
+            # Column headers were: ID, Task, ...
             df_log = df_log[
                 df_log['ID'].astype(str).str.lower().str.contains(search_txt) | 
-                df_log['Descripción'].astype(str).str.lower().str.contains(search_txt)
+                df_log['Task'].astype(str).str.lower().str.contains(search_txt)
             ]
                 
         if df_log.empty:
@@ -1226,9 +1226,9 @@ with tab_analytics:
             # If filtered, we can't get previous data from it.
             # We need 'st.session_state.logs_data' again for "Previous".
             full_df = st.session_state.logs_data.copy()
-            full_df['Seconds'] = full_df['Tiempo'].apply(parse_dur)
+            full_df['Seconds'] = full_df['Duration'].apply(parse_dur)
             full_df['Hours'] = full_df['Seconds'] / 3600.0
-            full_df['StartDT'] = pd.to_datetime(full_df['Fecha Inicio'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+            full_df['StartDT'] = pd.to_datetime(full_df['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
             full_df['Date'] = full_df['StartDT'].dt.date
             
             prev_mask = (full_df['Date'] >= prev_s) & (full_df['Date'] <= prev_e)
@@ -1239,7 +1239,7 @@ with tab_analytics:
             
             # C. Top Category
             if not df_log.empty:
-                top_cat_s = df_log.groupby('Categoría')['Hours'].sum()
+                top_cat_s = df_log.groupby('Category')['Hours'].sum()
                 if not top_cat_s.empty:
                     top_cat = top_cat_s.idxmax()
                     top_cat_val = top_cat_s.max()
@@ -1335,18 +1335,18 @@ with tab_analytics:
             # -------------------------------------------------------
             st.subheader("🌊 Time River (Context Breakdown)")
             
-            # Group by Category AND Project (ID + Desc)
-            river_agg = df_log.groupby(['Categoría', 'ID', 'Descripción'])['Hours'].sum().reset_index()
-            river_agg['Project'] = river_agg['ID'] + ": " + river_agg['Descripción']
+            # Group by Category AND Project (ID + Task)
+            river_agg = df_log.groupby(['Category', 'ID', 'Task'])['Hours'].sum().reset_index()
+            river_agg['Project'] = river_agg['ID'] + ": " + river_agg['Task']
             river_agg['DurationStr'] = (river_agg['Hours'] * 3600).apply(format_time)
             
             # Stacked Bar: X=Hours, Y=Category, Color=Project
             chart_river = alt.Chart(river_agg).mark_bar().encode(
                 x=alt.X('Hours', title='Total Hours', stack='zero'),
-                y=alt.Y('Categoría', title='Category'),
+                y=alt.Y('Category', title='Category'),
                 color=alt.Color('Project', title='Project', legend=alt.Legend(orient="bottom", columns=3)),
                 tooltip=[
-                    alt.Tooltip('Categoría', title='Category'),
+                    alt.Tooltip('Category', title='Category'),
                     alt.Tooltip('Project', title='Project'),
                     alt.Tooltip('DurationStr', title='Time')
                 ]
@@ -1360,7 +1360,7 @@ with tab_analytics:
             # -------------------------------------------------------
             st.subheader("🏆 Project Leaderboard")
             
-            proj_lead = df_log.groupby(['ID', 'Descripción', 'Categoría'])['Hours'].sum().reset_index()
+            proj_lead = df_log.groupby(['ID', 'Task', 'Category'])['Hours'].sum().reset_index()
             total_h = proj_lead['Hours'].sum()
             proj_lead['% Total'] = (proj_lead['Hours'] / total_h)
             proj_lead['Duration'] = (proj_lead['Hours'] * 3600).apply(format_time)
@@ -1369,7 +1369,7 @@ with tab_analytics:
             
             # Display as interactive dataframe with Progress Column
             st.dataframe(
-                proj_lead[['ID', 'Descripción', 'Categoría', 'Duration', '% Total']],
+                proj_lead[['ID', 'Task', 'Category', 'Duration', '% Total']],
                 column_config={
                     "% Total": st.column_config.ProgressColumn(
                         "Impact",
@@ -1393,7 +1393,14 @@ with tab_logs:
         df_log = st.session_state.logs_data
         if not df_log.empty:
             # Show newest first
-            st.dataframe(df_log, use_container_width=True)
+            st.dataframe(
+                df_log, 
+                use_container_width=True,
+                column_config={
+                   "Start Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
+                   "End Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
+                }
+            )
         else:
             st.info("No logs found yet.")
 
