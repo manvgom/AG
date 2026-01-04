@@ -205,6 +205,30 @@ def load_categories():
             st.session_state.categories_list = DEFAULT_CATEGORIES
             st.session_state.categories_desc = {c: "" for c in DEFAULT_CATEGORIES}
 
+            st.session_state.categories_list = DEFAULT_CATEGORIES
+            st.session_state.categories_desc = {c: "" for c in DEFAULT_CATEGORIES}
+
+def save_categories():
+    """Persist current categories_list and categories_desc to Sheet."""
+    try:
+        gc = get_gc()
+        secrets = find_credentials(st.secrets)
+        url = secrets.get("spreadsheet") if secrets else None
+        if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
+        if url:
+            sh = gc.open_by_url(url)
+            ws = sh.worksheet("Categories")
+            ws.clear()
+            ws.append_row(["Category", "Description"])
+            
+            # Bulk update
+            if 'categories_list' in st.session_state:
+                 rows = [[c, st.session_state.categories_desc.get(c, "")] for c in st.session_state.categories_list]
+                 if rows:
+                     ws.update(f"A2:B{len(rows)+1}", rows)
+    except Exception as e:
+        print(f"Error saving categories: {e}")
+
 def add_category(new_cat_name, new_cat_desc=""):
     if new_cat_name and new_cat_name not in st.session_state.categories_list:
         st.session_state.categories_list.append(new_cat_name)
@@ -212,18 +236,8 @@ def add_category(new_cat_name, new_cat_desc=""):
         st.session_state.categories_desc[new_cat_name] = new_cat_desc
         
         # Persist
-        try:
-            gc = get_gc()
-            secrets = find_credentials(st.secrets)
-            url = secrets.get("spreadsheet") if secrets else None
-            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
-            if url:
-                sh = gc.open_by_url(url)
-                ws = sh.worksheet("Categories")
-                ws.append_row([new_cat_name, new_cat_desc])
-                st.toast(f"Category '{new_cat_name}' added!", icon="✅")
-        except:
-             pass
+        save_categories()
+        st.toast(f"Category '{new_cat_name}' added!", icon="✅")
 
 def remove_category(cat_name):
     if cat_name in st.session_state.categories_list:
@@ -232,22 +246,8 @@ def remove_category(cat_name):
              st.session_state.categories_desc.pop(cat_name, None)
              
         # Persist (Overwrite list)
-        try:
-            gc = get_gc()
-            secrets = find_credentials(st.secrets)
-            url = secrets.get("spreadsheet") if secrets else None
-            if not url and "spreadsheet" in st.secrets: url = st.secrets["spreadsheet"]
-            if url:
-                sh = gc.open_by_url(url)
-                ws = sh.worksheet("Categories")
-                ws.clear()
-                ws.append_row(["Category", "Description"])
-                # Bulk update
-                rows = [[c, st.session_state.categories_desc.get(c, "")] for c in st.session_state.categories_list]
-                if rows:
-                    ws.update(f"A2:B{len(rows)+1}", rows)
-                st.toast(f"Category '{cat_name}' removed!", icon="🗑️")
-        except Exception as e:
+        save_categories()
+        st.toast(f"Category '{cat_name}' removed!", icon="🗑️")
             st.warning(f"Error removing category: {e}")
 
 def update_category(old_name, new_name, new_desc):
