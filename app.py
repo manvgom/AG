@@ -827,11 +827,11 @@ def manage_categories_dialog():
                 if new_cat:
                     update_category(edit_target, new_cat, new_desc)
                     st.session_state.cat_edit_target = None # Exit edit mode
-                    st.rerun() # Force rerun to switch back to list view inside fragment
+                    # st.rerun() # REMOVED: Triggers dialog closure
         with c_cancel:
              if st.button("Cancel", use_container_width=True):
                  st.session_state.cat_edit_target = None
-                 st.rerun()
+                 # st.rerun() # REMOVED: Triggers dialog closure
                  
     else:
         # ADD MODE
@@ -864,11 +864,12 @@ def manage_categories_dialog():
             # Edit Button
             if c2.button("✏️", key=f"edit_cat_dialog_{cat}"):
                 st.session_state.cat_edit_target = cat
-                st.rerun()
+                # st.rerun() # REMOVED: Triggers dialog closure
                 
             # Delete Button
             if c3.button("🗑️", key=f"rm_cat_dialog_{cat}"):
                 remove_category(cat)
+                # st.rerun() # REMOVED: Triggers dialog closure
     
     # Close button removed as per request (Dialog has built-in close)
 
