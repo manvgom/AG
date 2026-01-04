@@ -821,6 +821,7 @@ def manage_categories_dialog():
         new_cat = st.text_input("Category Name", value=edit_target, key="dialog_edit_cat")
         new_desc = st.text_area("Description (Optional)", value=current_desc, key="dialog_edit_desc")
         
+        c_up, c_cancel = st.columns([1, 1])
         with c_up:
             if st.button("Update", type="primary", use_container_width=True):
                 if new_cat:
