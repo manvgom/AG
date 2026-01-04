@@ -1065,17 +1065,24 @@ with tab_analytics:
         df_log = st.session_state.logs_data.copy()
         
         # Schema: ["ID", "Descripción", "Categoría", "Fecha Inicio", "Fecha Fin", "Tiempo"]
-        # Convert 'Tiempo' (Seconds) to float
-        df_log['Seconds'] = pd.to_numeric(df_log['Tiempo'], errors='coerce').fillna(0)
+        # Parse 'Tiempo' (HH:MM:SS) -> Seconds manually
+        def parse_dur(x):
+            try:
+                parts = str(x).split(':')
+                if len(parts) == 3:
+                     h, m, s = map(int, parts)
+                     return h*3600 + m*60 + s
+            except:
+                pass
+            return 0.0
+            
+        df_log['Seconds'] = df_log['Tiempo'].apply(parse_dur)
+        # df_log['Seconds'] = pd.to_numeric(df_log['Tiempo'], errors='coerce').fillna(0) # OLD: Failed because it's HH:MM:SS string
+        
         df_log['Hours'] = df_log['Seconds'] / 3600.0
         
         # Convert Dates
-        # Format in Sheet is usually DD/MM/YYYY or from epoch.
-        # Actually in log_session we write "Date" column manually with DD/MM/YYYY or similar?
-        # Wait, the new schema has "Fecha Inicio" which is likely a Timestamp or Date.
-        # Let's check 'log_session'. It uses 'today_str' for Date, and start/end epoch.
-        # Ah, 'log_session' writes: [id, name, cat_str, start_dt, end_dt, elapsed]
-        # start_dt is datetime.fromtimestamp(start_epoch).strftime("%d/%m/%Y %H:%M:%S")
+        # Format in Sheet is "DD/MM/YYYY HH:MM:SS" from log_session
         
         # Parse 'Fecha Inicio' to datetime
         df_log['StartDT'] = pd.to_datetime(df_log['Fecha Inicio'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
