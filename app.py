@@ -1041,7 +1041,7 @@ with tab_tracker:
                     
                     with f_col1:
                         if not show_archived:
-                            if st.button(f"➕ Add Category", key=f"add_sibling_{g_id}_{g_name}"):
+                            if st.button(f"➕ Add Category", key=f"add_sibling_{g_id}_{g_name}", use_container_width=True):
                                 add_sibling_task_dialog(g_id, g_name)
                     
                     with f_col2:
