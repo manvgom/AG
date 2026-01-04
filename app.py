@@ -1038,10 +1038,11 @@ with tab_tracker:
                     # Header row for the group content
                     # Col widths: Category, Duration, Action, Edit, Note, Del
                     # Previous was [2.5, 1.2, 1.5, ...]. Removed 1.2 (Date). Added to Category -> 3.7
-                    h_cols = st.columns([3.7, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
-                    h_cols[0].markdown("**Category**")
-                    # h_cols[1] was Date
-                    h_cols[1].markdown("**Duration**")
+                    if g_tasks:
+                        # h_cols = st.columns([3.7, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
+                        # h_cols[0].markdown("**Category**") # Removed
+                        # h_cols[1].markdown("**Duration**") # Removed
+                        pass
                     
                     for idx, task in g_tasks:
                         r_cols = st.columns([3.7, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
