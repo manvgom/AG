@@ -950,64 +950,62 @@ with tab_tracker:
     
     st.markdown("""
         <style>
-        /* General alignment for the row */
+        /* [AG] Universal Alignment Fix */
+        
+        /* 1. Target the Horizontal Block to align items vertically center */
         div[data-testid="stHorizontalBlock"] {
             align-items: center !important;
         }
-        div[data-testid="stHorizontalBlock"] > div {
-            vertical-align: middle !important;
-        }
         
-        /* Force height unification to 35px for all input types */
+        /* 2. Force ALL Input-like containers to exactly 35px height */
+        /* Text Input, Date Input, Selectbox, MultiSelect */
         
-        /* Text Input (Search) */
-        div[data-testid="stTextInput"] div[data-baseweb="input"] {
+        div[data-testid="stTextInput"] div[data-baseweb="input"],
+        div[data-testid="stDateInput"] div[data-baseweb="input"], 
+        div[data-testid="stSelectbox"] div[data-baseweb="select"],
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {
             height: 35px !important;
             min-height: 35px !important;
-            padding: 0px !important;
-        }
-        div[data-testid="stTextInput"] input {
-            height: 35px !important;
-            min-height: 35px !important;
-            padding: 8px !important;
+            max-height: 35px !important;
+            border-radius: 4px !important;
+            overflow: hidden !important; /* Prevent chip spillover */
+            display: flex !important;
+            align-items: center !important;
         }
 
-        /* Date Input */
-        div[data-testid="stDateInput"] div[data-baseweb="input"] {
-            height: 35px !important;
-            min-height: 35px !important;
-        }
-        
-        /* MultiSelect (Category) - Tricky, often has chips. Force container height matches */
-        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {
-             min-height: 35px !important;
-             border-color: rgba(250, 250, 250, 0.2) !important;
-        }
-        
-        /* Button (New Task) */
+        /* 3. Button specific overrides */
         div[data-testid="stButton"] button {
             height: 35px !important;
             min-height: 35px !important;
-            padding: 0px !important;
-            line-height: 35px !important;
+            max-height: 35px !important;
+            padding: 0px 16px !important;
+            line-height: normal !important; /* Let flex center it */
             border: 1px solid rgba(250, 250, 250, 0.2);
+            border-radius: 4px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
         }
         
-        /* Checkbox alignment */
-        label[data-testid="stCheckbox"] {
-            min-height: 35px !important;
-            height: 35px !important;
-            align-items: center !important;
-            display: flex !important;
+        /* 4. Fix input text padding to center text vertically */
+        input {
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
+            height: 100% !important;
         }
         
-        /* Reduce dividers margin */
-        hr {
-            margin-top: 2px !important;
-            margin-bottom: 2px !important;
+        /* 5. Checkbox alignment */
+        label[data-testid="stCheckbox"] {
+            height: 35px !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        
+        /* 6. Fix for MultiSelect chips pushing height */
+        div[data-baseweb="tag"] {
+            margin-top: 0px !important;
+            margin-bottom: 0px !important;
+            height: 24px !important; /* Smaller chips to fit in 35px */
         }
         </style>
     """, unsafe_allow_html=True)
