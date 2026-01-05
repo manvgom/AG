@@ -1281,42 +1281,43 @@ with tab_analytics:
             st.caption("Where does your time actually go? Follow the stream.")
             
             # Sankey Data Prep
-            # Nodes: Categories + Tasks
-            # Links: Category -> Task
-            
-            # 1. Aggregation
-            sankey_data = df_log.groupby(['Category', 'Task'])['Hours'].sum().reset_index()
-            sankey_data = sankey_data[sankey_data['Hours'] > 0] # Filter zeros
+            sankey_data = df_log.groupby(['Category', 'Task'])['Seconds'].sum().reset_index()
+            sankey_data = sankey_data[sankey_data['Seconds'] > 0] 
             
             if not sankey_data.empty:
-                # 2. Create Node Lists
+                sankey_data['Formatted'] = sankey_data['Seconds'].apply(format_time)
+                
                 all_cats = list(sankey_data['Category'].unique())
                 all_tasks = list(sankey_data['Task'].unique())
-                
-                # Combine nodes: Categories first, then Tasks.
-                # Note: If a Task name is same as Category name, it confuses Plotly. Prepend/Append info.
                 node_labels = all_cats + all_tasks
                 node_map = {label: i for i, label in enumerate(node_labels)}
                 
-                # 3. Create Links
                 sources = [node_map[row['Category']] for _, row in sankey_data.iterrows()]
                 targets = [node_map[row['Task']] for _, row in sankey_data.iterrows()]
-                values = sankey_data['Hours'].tolist()
+                values = (sankey_data['Seconds'] / 3600.0).tolist() # Visual thickness still needs valid numeric
+                custom_data = sankey_data['Formatted'].tolist() # For tooltip
                 
-                # 4. Plot
+                # Note: Sankey hovertemplate is tricky for links vs nodes. 
+                # We will just try to simplify or use standard values, but user wants HH:MM:SS.
+                # Plotly Sankey shows "value" by default. We can replace it with customdata.
+                
                 fig_sankey = go.Figure(data=[go.Sankey(
                     node = dict(
                       pad = 15,
                       thickness = 20,
                       line = dict(color = "black", width = 0.5),
                       label = node_labels,
-                      color = "rgba(46, 204, 113, 0.5)" # Generic Greenish
+                      color = "rgba(46, 204, 113, 0.5)",
+                      # We'd need to pre-calculate node total time for HH:MM:SS on nodes, skipping for now to keep it simple or doing it right?
+                      # Let's do links first which is the "flow".
                     ),
                     link = dict(
                       source = sources,
                       target = targets,
                       value = values,
-                      color = "rgba(200, 200, 200, 0.3)" # Subtle grey links
+                      customdata = custom_data,
+                      hovertemplate='Source: %{source.label}<br>Target: %{target.label}<br>Time: %{customdata}<extra></extra>',
+                      color = "rgba(200, 200, 200, 0.3)" 
                   ))])
                 
                 fig_sankey.update_layout(title_text="", font_size=12, height=400, margin=dict(l=0, r=0, t=10, b=10))
@@ -1325,25 +1326,46 @@ with tab_analytics:
                 st.info("Not enough data for Flow Chart.")
 
             st.markdown("---")
+
+            # -------------------------------------------------------
+            # 3. Capital Allocation (Investment Portfolio)
+            # -------------------------------------------------------
+            st.subheader("💼 Capital Allocation (Time Investment)")
+            st.caption("Treat your time like a limited budget. Where are you investing?")
+            
+            # Prepare Data for Donut (Category Level)
+            cap_agg = df_log.groupby('Category')['Seconds'].sum().reset_index()
+            cap_agg['Hours'] = cap_agg['Seconds'] / 3600.0
+            cap_agg['Formatted'] = cap_agg['Seconds'].apply(format_time)
+            
+            # Donut Chart
+            chart_cap = alt.Chart(cap_agg).mark_arc(innerRadius=60).encode(
+                theta=alt.Theta(field="Hours", type="quantitative"),
+                color=alt.Color(field="Category", type="nominal"),
+                tooltip=['Category', alt.Tooltip('Formatted', title='Time')],
+                order=alt.Order("Hours", sort="descending")
+            ).properties(height=300)
+            
+            st.altair_chart(chart_cap, use_container_width=True)
+
+            st.markdown("---")
             
             # -------------------------------------------------------
-            # 3. Heatmap & Evolution
+            # 4. Heatmap & Evolution
             # -------------------------------------------------------
             c_heat, c_evol = st.columns(2)
             
             with c_heat:
                 st.subheader("🔥 Intensity Map")
                 # Prepare Data: Date, Hours
-                heat_data = df_log.groupby('Date')['Hours'].sum().reset_index()
+                heat_data = df_log.groupby('Date')['Seconds'].sum().reset_index()
+                heat_data['Hours'] = heat_data['Seconds'] / 3600.0
+                heat_data['Formatted'] = heat_data['Seconds'].apply(format_time)
                 
-                # Basic Plotly Heatmap (Calendar-like)
-                # We'll use a simple scatter or bar if proper calendar is hard, 
-                # but let's try a heatmap on Week vs DayOfWeek
                 heat_data['Date'] = pd.to_datetime(heat_data['Date'])
                 heat_data['Week'] = heat_data['Date'].dt.isocalendar().week
                 heat_data['Day'] = heat_data['Date'].dt.day_name()
                 
-                # Order days
                 days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
                 
                 fig_heat = px.density_heatmap(
@@ -1353,20 +1375,19 @@ with tab_analytics:
                     z="Hours", 
                     color_continuous_scale="Greens",
                     category_orders={"Day": days_order},
-                    nbinsx=52 # Ensure weeks aren't bucketed too aggressively
+                    nbinsx=52,
+                    custom_data=['Formatted']
                 )
+                fig_heat.update_traces(hovertemplate='Week: %{x}<br>Day: %{y}<br>Time: %{customdata[0]}<extra></extra>')
                 fig_heat.update_layout(height=350, title="Daily Intensity")
                 st.plotly_chart(fig_heat, use_container_width=True)
                 
             with c_evol:
                 st.subheader("📈 Strategy Evolution")
-                # Stacked Bar: Week vs Hours, Color=Category
-                # Use FULL data for evolution to show trend, filters apply if user wants focused view, 
-                # but usually evolution is best on broad scope. Let's respect filters though.
-                
-                # We need 'WeekStart'
                 df_log['WeekStart'] = df_log['StartDT'].dt.to_period('W').apply(lambda r: r.start_time)
-                evol_data = df_log.groupby(['WeekStart', 'Category'])['Hours'].sum().reset_index()
+                evol_data = df_log.groupby(['WeekStart', 'Category'])['Seconds'].sum().reset_index()
+                evol_data['Hours'] = evol_data['Seconds'] / 3600.0
+                evol_data['Formatted'] = evol_data['Seconds'].apply(format_time)
                 
                 if not evol_data.empty:
                     fig_evol = px.bar(
@@ -1375,8 +1396,10 @@ with tab_analytics:
                         y="Hours", 
                         color="Category", 
                         title="",
-                        labels={"WeekStart": "Week", "Hours": "Total Hours"}
+                        labels={"WeekStart": "Week", "Hours": "Total Hours"},
+                        custom_data=['Formatted', 'Category']
                     )
+                    fig_evol.update_traces(hovertemplate='Week: %{x}<br>Category: %{customdata[1]}<br>Time: %{customdata[0]}<extra></extra>')
                     fig_evol.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                     st.plotly_chart(fig_evol, use_container_width=True)
                 else:
