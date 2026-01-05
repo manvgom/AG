@@ -1262,12 +1262,12 @@ with tab_analytics:
         # Re-adding implicit search if needed, but for now strict Smart Bar
         
         if df_log.empty:
-             pass # Handled below
+             pass 
     else:
-         df_log = pd.DataFrame() # Fallback
+         df_log = pd.DataFrame() 
                 
-        if df_log.empty:
-            st.warning("No data for selected period.")
+    if df_log.empty:
+        st.warning("No data for selected period.")
         else:
             # -------------------------------------------------------
             # 1. KPIs Section
