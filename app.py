@@ -1356,130 +1356,94 @@ with tab_analytics:
             st.markdown("---")
 
             # -------------------------------------------------------
-            # 1. Executive Summary (High-Level KPIs)
+            # 1. The PM Health Monitor (KPIs)
             # -------------------------------------------------------
-            st.markdown("### 🦅 Executive Vision")
+            st.markdown("### 🩺 PM Health Pulse")
             
-            # --- KPI 1: Weekly Velocity (Trend) ---
-            # We need broader context than just the filtered view for the trend.
-            # Default to last 12 weeks from full_df
-            full_df = st.session_state.logs_data.copy()
-            full_df['StartDT'] = pd.to_datetime(full_df['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
-            full_df['Date'] = full_df['StartDT'].dt.date
+            # KPI Calculations
+            df_log['Seconds'] = df_log['Duration'].apply(parse_dur) # Ensure we have seconds
             
-            # Calculate Week Start (Monday) for grouping
-            full_df['WeekStart'] = full_df['StartDT'].dt.to_period('W').apply(lambda r: r.start_time)
+            # A. Fragmentation Index (Context Switches / Hour)
+            total_hours_log = df_log['Seconds'].sum() / 3600.0
+            total_sessions = len(df_log)
+            frag_index = (total_sessions / total_hours_log) if total_hours_log > 0 else 0
             
-            # Group by Week
-            velocity_agg = full_df.groupby('WeekStart')['Duration'].apply(lambda x: pd.to_timedelta(x).sum().total_seconds() / 3600.0).reset_index()
-            velocity_agg.columns = ['Week', 'Hours']
+            # B. Focus Depth (Avg Session Duration in Mins)
+            avg_session_min = (df_log['Seconds'].mean() / 60.0) if not df_log.empty else 0
             
-            # Filter to last 12 weeks so it's readable
-            twelve_weeks_ago = pd.Timestamp.now() - pd.Timedelta(weeks=12)
-            velocity_agg = velocity_agg[velocity_agg['Week'] >= twelve_weeks_ago]
+            # C. Shipping Volume (Unique Tasks Touched)
+            # Assuming ID is unique per task
+            unique_tasks = df_log['ID'].nunique()
             
-            velocity_chart = alt.Chart(velocity_agg).mark_line(point=True, color='#2ECC71').encode(
-                x=alt.X('Week:T', title='Week', axis=alt.Axis(format='%d %b')),
-                y=alt.Y('Hours', title='Total Hours'),
-                tooltip=[alt.Tooltip('Week', format='%d %b'), 'Hours']
-            ).properties(title="Weekly Velocity (Last 12 Weeks)", height=200)
-
-            # --- KPI 2: Strategic Focus (Stacked Bar 100%) ---
-            # Group by Week + Category
-            strategy_agg = full_df.groupby(['WeekStart', 'Category'])['Duration'].apply(lambda x: pd.to_timedelta(x).sum().total_seconds() / 3600.0).reset_index()
-            strategy_agg.columns = ['Week', 'Category', 'Hours']
-            strategy_agg = strategy_agg[strategy_agg['Week'] >= twelve_weeks_ago]
-            
-            strategy_chart = alt.Chart(strategy_agg).mark_bar().encode(
-                x=alt.X('Week:T', title='Week'),
-                y=alt.Y('Hours', stack='normalize', title='Focus Distribution %'),
-                color='Category',
-                tooltip=['Week', 'Category', 'Hours']
-            ).properties(title="Strategic Focus Evolution", height=200)
-            
-            # --- KPI 3: Focus Quality Score ---
-            # Define Deep Work session > 45 mins (2700 seconds)
-            # We calculate this on the FILTERED data (df_log) to see quality of CURRENT selection
-            df_log['Seconds'] = df_log['Duration'].apply(parse_dur) # Ensure seconds column exists
-            deep_work_seconds = df_log[df_log['Seconds'] >= 2700]['Seconds'].sum()
-            total_seconds = df_log['Seconds'].sum()
-            quality_score = (deep_work_seconds / total_seconds * 100) if total_seconds > 0 else 0
-            
-            # Render Executive Row
-            c_exec1, c_exec2, c_exec3 = st.columns([2, 2, 1])
-            with c_exec1: st.altair_chart(velocity_chart, use_container_width=True)
-            with c_exec2: st.altair_chart(strategy_chart, use_container_width=True)
-            with c_exec3: 
-                st.metric("Focus Quality Score", f"{quality_score:.1f}%", help="% Time in sessions > 45 min")
-                st.progress(quality_score / 100)
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Fragmentation Index", f"{frag_index:.1f}", help="Sessions per Hour. Lower is better.", delta=None)
+            k2.metric("Focus Depth", f"{avg_session_min:.0f} min", help="Avg Session Duration. Higher is better.")
+            k3.metric("Shipping Volume", f"{unique_tasks}", help="Unique Tasks moved forward today.")
             
             st.markdown("---")
             
             # -------------------------------------------------------
-            # 2. Pragmatic Action (Daily Detail)
+            # 2. Capital Allocation (Investment Portfolio)
             # -------------------------------------------------------
-            st.markdown("### ⚡ Pragmatic Action")
+            st.subheader("💼 Capital Allocation (Time Investment)")
+            st.caption("Treat your time like a limited budget. Where are you investing?")
             
-            # Tab Structure for detailed views
-            t_prag1, t_prag2, t_prag3 = st.tabs(["⏳ Timeline", "🏗️ Effort Matrix", "🧘 Deep Work"])
+            cap_agg = df_log.groupby('Category')['Seconds'].sum().reset_index()
+            cap_agg['Hours'] = cap_agg['Seconds'] / 3600.0
             
-            with t_prag1:
-                # --- VIEW 1: Session Timeline (Gantt) ---
-                st.caption("Visualize your day's fragmentation. Are you working in blocks or scattered?")
-                
-                # We need Start and End times as datetime objects
-                # df_log has 'StartDT' already. We need EndDT.
-                # End Time is string in sheet usually.
-                df_log['EndDT'] = pd.to_datetime(df_log['End Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
-                
-                # If EndDT is missing (active task?), skip or handle
-                valid_sessions = df_log.dropna(subset=['StartDT', 'EndDT']).copy()
-                
-                # Altair Gantt
-                timeline_chart = alt.Chart(valid_sessions).mark_bar().encode(
-                    x=alt.X('StartDT:T', title='Time'),
-                    x2='EndDT:T',
-                    y=alt.Y('Category', title=None),
-                    color='Category',
-                    tooltip=['Task', 'Start Time', 'End Time', 'Duration']
-                ).properties(height=300)
-                
-                st.altair_chart(timeline_chart, use_container_width=True)
-                
-            with t_prag2:
-                # --- VIEW 2: Effort Matrix (Pivot) ---
-                st.caption("The 'Timesheet' view. Hours spent per Task per Day.")
-                
-                pivot_df = df_log.copy()
-                pivot_df['DateStr'] = pivot_df['StartDT'].dt.strftime('%Y-%m-%d')
-                
-                # Pivot: Index=Task, Columns=Date, Values=Hours
-                matrix = pivot_df.pivot_table(index=['Category', 'Task'], columns='DateStr', values='Hours', aggfunc='sum', fill_value=0)
-                
-                # Styling: Heatmap-like background? (Streamlit allows limited styling)
-                # Let's just show the clean dataframe
-                st.dataframe(matrix, use_container_width=True)
-                
-            with t_prag3:
-                # --- VIEW 3: Deep Work Leaderboard ---
-                st.caption("Gamifying Focus. Top individual sessions sorted by duration.")
-                
-                # Sort by Seconds descending
-                deep_df = df_log.sort_values('Seconds', ascending=False).reset_index(drop=True)
-                
-                # Formatting
-                deep_df['Rank'] = deep_df.index + 1
-                deep_df['Session'] = deep_df['Duration']
-                
-                st.dataframe(
-                    deep_df[['Rank', 'Category', 'Task', 'Date', 'Start Time', 'Session']],
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Rank": st.column_config.NumberColumn("🏆", width="small"),
-                        "Session": st.column_config.TextColumn("Duration")
-                    }
-                )
+            # Donut Chart with Labels
+            chart_cap = alt.Chart(cap_agg).mark_arc(innerRadius=60).encode(
+                theta=alt.Theta(field="Hours", type="quantitative"),
+                color=alt.Color(field="Category", type="nominal"),
+                tooltip=['Category', alt.Tooltip('Hours', format='.1f')],
+                order=alt.Order("Hours", sort="descending")
+            ).properties(height=300)
+            
+            st.altair_chart(chart_cap, use_container_width=True)
+            
+            st.markdown("---")
+
+            # -------------------------------------------------------
+            # 3. Focus Topography (Bubble Chart)
+            # -------------------------------------------------------
+            st.subheader("🧠 Focus Topography")
+            st.caption("Visualizing your attention span. Large bubbles = Deep Work. Clusters of dots = Interruption Hell.")
+            
+            # Scatter Plot: X=Time of Day, Y=Duration (Bubble Size)
+            # We need simple Time of Day for X axix
+            df_log['TimeOfDay'] = df_log['StartDT'].dt.strftime('%H:%M')
+            # Better: Use Hours + Minutes fraction for linear X axis
+            df_log['DayHour'] = df_log['StartDT'].dt.hour + df_log['StartDT'].dt.minute / 60.0
+            df_log['DurationMin'] = df_log['Seconds'] / 60.0
+            
+            chart_topo = alt.Chart(df_log).mark_circle().encode(
+                x=alt.X('StartDT:T', title='Time of Day'),
+                y=alt.Y('DurationMin:Q', title='Session Duration (min)'),
+                size=alt.Size('DurationMin:Q', title='Focus Depth', scale=alt.Scale(range=[30, 1000])),
+                color='Category',
+                tooltip=['Task', 'Category', 'Duration', 'Start Time']
+            ).properties(height=350).interactive()
+            
+            st.altair_chart(chart_topo, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # -------------------------------------------------------
+            # 4. Shipping Manifest (List of Output)
+            # -------------------------------------------------------
+            st.subheader("📦 Shipping Manifest")
+            st.caption("What did we actually move forward today?")
+            
+            # Group by Task -> Sum Time -> Sort by Time
+            manifest = df_log.groupby(['ID', 'Task', 'Category'])['Seconds'].sum().reset_index()
+            manifest['Total Time'] = (manifest['Seconds'] / 3600.0).map('{:,.2f}h'.format)
+            manifest = manifest.sort_values('Seconds', ascending=False)
+            
+            st.dataframe(
+                manifest[['ID', 'Task', 'Category', 'Total Time']],
+                use_container_width=True,
+                hide_index=True
+            )
 
 
 
