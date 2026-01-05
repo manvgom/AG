@@ -1376,7 +1376,7 @@ with tab_analytics:
                     color_continuous_scale="Greens",
                     category_orders={"Day": days_order},
                     nbinsx=52,
-                    custom_data=['Formatted']
+                    hover_data=['Formatted']
                 )
                 fig_heat.update_traces(hovertemplate='Week: %{x}<br>Day: %{y}<br>Time: %{customdata[0]}<extra></extra>')
                 fig_heat.update_layout(height=350, title="Daily Intensity")
@@ -1397,7 +1397,7 @@ with tab_analytics:
                         color="Category", 
                         title="",
                         labels={"WeekStart": "Week", "Hours": "Total Hours"},
-                        custom_data=['Formatted', 'Category']
+                        hover_data=['Formatted', 'Category']
                     )
                     fig_evol.update_traces(hovertemplate='Week: %{x}<br>Category: %{customdata[1]}<br>Time: %{customdata[0]}<extra></extra>')
                     fig_evol.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
