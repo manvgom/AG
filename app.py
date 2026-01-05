@@ -933,25 +933,27 @@ with tab_tracker:
         st.button("Add", on_click=add_task, use_container_width=True)
 
     # Filters
-    with st.expander("🔎 Filters", expanded=False):
-        col_f1, col_f2, col_f3 = st.columns([2, 1.5, 1.5])
-        with col_f1:
-            search_query = st.text_input("Search (ID or Task)", placeholder="Type to search...").lower()
-        with col_f2:
-            filter_categories = st.multiselect("Filter by Category", st.session_state.get('categories_list', DEFAULT_CATEGORIES))
-        with col_f3:
-            filter_date = st.date_input("Filter by Date Range", value=[], help="Select a range")
-        
-        # Calculate unique archived groups count
-        archived_groups_count = 0
-        if st.session_state.tasks:
-             arch_pairs = set()
-             for t in st.session_state.tasks:
-                 if t.get('archived', False):
-                     arch_pairs.add((t.get('id', '').strip(), t.get('name', '').strip()))
-             archived_groups_count = len(arch_pairs)
-        
-        show_archived = st.checkbox(f"Show Archived Projects [{archived_groups_count}]", value=False)
+    # Filters
+    # Calculate unique archived groups count first
+    archived_groups_count = 0
+    if st.session_state.tasks:
+         arch_pairs = set()
+         for t in st.session_state.tasks:
+             if t.get('archived', False):
+                 arch_pairs.add((t.get('id', '').strip(), t.get('name', '').strip()))
+         archived_groups_count = len(arch_pairs)
+
+    f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1.5, 1.5, 1.2], vertical_alignment="center")
+    with f_col1:
+        search_query = st.text_input("Search", placeholder="Search ID or Task...", label_visibility="collapsed").lower()
+    with f_col2:
+        # Check if we have categories, else default
+        cat_options = st.session_state.get('categories_list', DEFAULT_CATEGORIES)
+        filter_categories = st.multiselect("Category", cat_options, placeholder="Category", label_visibility="collapsed")
+    with f_col3:
+        filter_date = st.date_input("Date", value=[], label_visibility="collapsed")
+    with f_col4:
+        show_archived = st.checkbox(f"Archived [{archived_groups_count}]", value=False)
 
     # Task List Logic
     if not st.session_state.tasks:
