@@ -1265,10 +1265,61 @@ with tab_analytics:
          df_log = pd.DataFrame() # Fallback 
                 
     if df_log.empty:
-        st.warning("No data for selected period.")
     else:
             # -------------------------------------------------------
-            # 1. Capital Allocation (Investment Portfolio)
+            # 1. KPIs Section (Restored)
+            # -------------------------------------------------------
+            # Logic for KPIs
+            total_hours = df_log['Hours'].sum()
+            
+            # Comparison (Velocity)
+            if date_range and len(date_range) == 2:
+                s, e = date_range
+                delta = (e - s).days + 1
+                prev_s = s - pd.Timedelta(days=delta)
+                prev_e = s - pd.Timedelta(days=1)
+            else:
+                 delta = 7
+                 today = datetime.now(MADRID_TZ).date()
+                 s = today - pd.Timedelta(days=6)
+                 prev_s = s - pd.Timedelta(days=7)
+                 prev_e = s - pd.Timedelta(days=1)
+            
+            full_df = st.session_state.logs_data.copy()
+            full_df['Seconds'] = full_df['Duration'].apply(parse_dur)
+            full_df['Hours'] = full_df['Seconds'] / 3600.0
+            full_df['StartDT'] = pd.to_datetime(full_df['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+            full_df['Date'] = full_df['StartDT'].dt.date
+            
+            prev_mask = (full_df['Date'] >= prev_s) & (full_df['Date'] <= prev_e)
+            prev_hours = full_df.loc[prev_mask, 'Hours'].sum()
+            
+            delta_val = total_hours - prev_hours
+            delta_pct = (delta_val / prev_hours * 100) if prev_hours > 0 else 100 if total_hours > 0 else 0
+            
+            # Top Category
+            if not df_log.empty:
+                top_cat_s = df_log.groupby('Category')['Hours'].sum()
+                if not top_cat_s.empty:
+                    top_cat = top_cat_s.idxmax()
+                    top_cat_val = top_cat_s.max()
+                else:
+                    top_cat = "-"
+                    top_cat_val = 0
+            else:
+                top_cat = "-"
+                top_cat_val = 0
+
+            # Render KPIs (No Title, No Streak)
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Total Focus Time", format_time(total_hours * 3600), delta=f"{delta_pct:.1f}%")
+            k2.metric("Velocity (vs Prev)", format_time(delta_val * 3600)) 
+            k3.metric("Top Focus", top_cat, format_time(top_cat_val * 3600))
+            
+            st.markdown("---")
+
+            # -------------------------------------------------------
+            # 2. Capital Allocation (Investment Portfolio)
             # -------------------------------------------------------
             st.subheader("💼 Capital Allocation (Time Investment)")
             st.caption("Treat your time like a limited budget. Where are you investing?")
