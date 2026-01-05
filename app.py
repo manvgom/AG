@@ -1356,94 +1356,30 @@ with tab_analytics:
             st.markdown("---")
 
             # -------------------------------------------------------
-            # 1. The PM Health Monitor (KPIs)
-            # -------------------------------------------------------
-            st.markdown("### 🩺 PM Health Pulse")
-            
-            # KPI Calculations
-            df_log['Seconds'] = df_log['Duration'].apply(parse_dur) # Ensure we have seconds
-            
-            # A. Fragmentation Index (Context Switches / Hour)
-            total_hours_log = df_log['Seconds'].sum() / 3600.0
-            total_sessions = len(df_log)
-            frag_index = (total_sessions / total_hours_log) if total_hours_log > 0 else 0
-            
-            # B. Focus Depth (Avg Session Duration in Mins)
-            avg_session_min = (df_log['Seconds'].mean() / 60.0) if not df_log.empty else 0
-            
-            # C. Shipping Volume (Unique Tasks Touched)
-            # Assuming ID is unique per task
-            unique_tasks = df_log['ID'].nunique()
-            
-            k1, k2, k3 = st.columns(3)
-            k1.metric("Fragmentation Index", f"{frag_index:.1f}", help="Sessions per Hour. Lower is better.", delta=None)
-            k2.metric("Focus Depth", f"{avg_session_min:.0f} min", help="Avg Session Duration. Higher is better.")
-            k3.metric("Shipping Volume", f"{unique_tasks}", help="Unique Tasks moved forward today.")
-            
-            st.markdown("---")
-            
-            # -------------------------------------------------------
             # 2. Capital Allocation (Investment Portfolio)
             # -------------------------------------------------------
             st.subheader("💼 Capital Allocation (Time Investment)")
-            st.caption("Treat your time like a limited budget. Where are you investing?")
+            st.caption("Detailed investment by Task. Where is the budget going?")
             
-            cap_agg = df_log.groupby('Category')['Seconds'].sum().reset_index()
+            # Prepare Data: Group by ID+Task to show granular allocation
+            df_log['Seconds'] = df_log['Duration'].apply(parse_dur)
+            cap_agg = df_log.groupby(['ID', 'Task', 'Category'])['Seconds'].sum().reset_index()
             cap_agg['Hours'] = cap_agg['Seconds'] / 3600.0
             
-            # Donut Chart with Labels
-            chart_cap = alt.Chart(cap_agg).mark_arc(innerRadius=60).encode(
-                theta=alt.Theta(field="Hours", type="quantitative"),
-                color=alt.Color(field="Category", type="nominal"),
-                tooltip=['Category', alt.Tooltip('Hours', format='.1f')],
-                order=alt.Order("Hours", sort="descending")
-            ).properties(height=300)
+            # Create a combined label for the chart
+            cap_agg['Label'] = cap_agg['ID'].astype(str) + ": " + cap_agg['Task']
+            
+            # Detailed Bar Chart
+            chart_cap = alt.Chart(cap_agg).mark_bar().encode(
+                x=alt.X('Hours', title='Total Hours Invested'),
+                y=alt.Y('Label', title='Task (ID)', sort='-x'),
+                color=alt.Color('Category', title='Category'),
+                tooltip=['ID', 'Task', 'Category', alt.Tooltip('Hours', format='.2f')]
+            ).properties(height=max(300, len(cap_agg) * 20)) # Dynamic height
             
             st.altair_chart(chart_cap, use_container_width=True)
             
             st.markdown("---")
-
-            # -------------------------------------------------------
-            # 3. Focus Topography (Bubble Chart)
-            # -------------------------------------------------------
-            st.subheader("🧠 Focus Topography")
-            st.caption("Visualizing your attention span. Large bubbles = Deep Work. Clusters of dots = Interruption Hell.")
-            
-            # Scatter Plot: X=Time of Day, Y=Duration (Bubble Size)
-            # We need simple Time of Day for X axix
-            df_log['TimeOfDay'] = df_log['StartDT'].dt.strftime('%H:%M')
-            # Better: Use Hours + Minutes fraction for linear X axis
-            df_log['DayHour'] = df_log['StartDT'].dt.hour + df_log['StartDT'].dt.minute / 60.0
-            df_log['DurationMin'] = df_log['Seconds'] / 60.0
-            
-            chart_topo = alt.Chart(df_log).mark_circle().encode(
-                x=alt.X('StartDT:T', title='Time of Day'),
-                y=alt.Y('DurationMin:Q', title='Session Duration (min)'),
-                size=alt.Size('DurationMin:Q', title='Focus Depth', scale=alt.Scale(range=[30, 1000])),
-                color='Category',
-                tooltip=['Task', 'Category', 'Duration', 'Start Time']
-            ).properties(height=350).interactive()
-            
-            st.altair_chart(chart_topo, use_container_width=True)
-            
-            st.markdown("---")
-            
-            # -------------------------------------------------------
-            # 4. Shipping Manifest (List of Output)
-            # -------------------------------------------------------
-            st.subheader("📦 Shipping Manifest")
-            st.caption("What did we actually move forward today?")
-            
-            # Group by Task -> Sum Time -> Sort by Time
-            manifest = df_log.groupby(['ID', 'Task', 'Category'])['Seconds'].sum().reset_index()
-            manifest['Total Time'] = (manifest['Seconds'] / 3600.0).map('{:,.2f}h'.format)
-            manifest = manifest.sort_values('Seconds', ascending=False)
-            
-            st.dataframe(
-                manifest[['ID', 'Task', 'Category', 'Total Time']],
-                use_container_width=True,
-                hide_index=True
-            )
 
 
 
