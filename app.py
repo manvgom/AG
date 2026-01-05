@@ -956,11 +956,20 @@ with tab_tracker:
     # Order matched to Analytics/Logs: Date -> Category -> Search (-> Archive)
     with f_col1:
         filter_date = st.date_input("Date", value=[], label_visibility="collapsed")
-    with f_col2:
         # Check if we have categories, else default
         if 'categories_list' not in st.session_state: load_categories()
-        # Strictly available categories
-        cat_options = sorted(st.session_state.categories_list)
+        
+        # Determine "Available" categories based on actual usage in tasks (User Request)
+        # Filter should only show categories that have at least one task associated
+        used_cats = set()
+        if st.session_state.tasks:
+            used_cats = {t.get('category') for t in st.session_state.tasks if t.get('category')}
+            
+        # Intersect with defined list to ensure valid ones, or just show all used?
+        # Safe bet: Show intersection so we respect "Managed" names, but fall back to used only if list missing
+        available_cats = sorted(list(used_cats))
+        
+        cat_options = available_cats
         filter_categories = st.multiselect("Category", cat_options, placeholder="Category", label_visibility="collapsed")
     with f_col3:
         search_query = st.text_input("Search", placeholder="Search ID or Task...", key="tracker_search", label_visibility="collapsed").lower()
