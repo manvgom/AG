@@ -915,7 +915,7 @@ with st.sidebar:
         logout()
 
 # Header
-st.title("🖥️ Tasks Monitor")
+st.title("🖥️ Tasks Tracker")
 st.markdown("---")
 
 # Tabs
@@ -923,14 +923,22 @@ tab_tracker, tab_analytics, tab_logs = st.tabs(["⏱️ Tracker", "📊 Analytic
 
 with tab_tracker:
     # Input Section
+    # Minimalist differentiator: Divider + Container style or just plain collapsed inputs with placeholder.
+    # User asked for "minimalist differentiation". Let's use a subheader/caption or just spacing.
+    # Also collapsed labels as requested.
+
     # 3 columns: ID | Description | Add
+    # Using 'label_visibility="collapsed"'
+    
     col0, col1, col2 = st.columns([1, 4, 1], vertical_alignment="bottom")
     with col0:
-        st.text_input("ID", key="new_task_id", placeholder="ID")
+        st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
     with col1:
-        st.text_input("Task", key="new_task_input", placeholder="Enter task name...")
+        st.text_input("Task", key="new_task_input", placeholder="New Task Description...", label_visibility="collapsed")
     with col2:
-        st.button("Add", on_click=add_task, use_container_width=True)
+        st.button("Add Task", on_click=add_task, use_container_width=True)
+
+    st.markdown("---") # Minimalist separation
 
     # Filters
     # Filters
@@ -943,15 +951,17 @@ with tab_tracker:
                  arch_pairs.add((t.get('id', '').strip(), t.get('name', '').strip()))
          archived_groups_count = len(arch_pairs)
 
-    f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1.5, 1.5, 1.2], vertical_alignment="center")
+    f_col1, f_col2, f_col3, f_col4 = st.columns([1.5, 1.5, 2, 1], vertical_alignment="center")
+    
+    # Order matched to Analytics/Logs: Date -> Category -> Search (-> Archive)
     with f_col1:
-        search_query = st.text_input("Search", placeholder="Search ID or Task...", key="tracker_search", label_visibility="collapsed").lower()
+        filter_date = st.date_input("Date", value=[], label_visibility="collapsed")
     with f_col2:
         # Check if we have categories, else default
         cat_options = st.session_state.get('categories_list', DEFAULT_CATEGORIES)
         filter_categories = st.multiselect("Category", cat_options, placeholder="Category", label_visibility="collapsed")
     with f_col3:
-        filter_date = st.date_input("Date", value=[], label_visibility="collapsed")
+        search_query = st.text_input("Search", placeholder="Search ID or Task...", key="tracker_search", label_visibility="collapsed").lower()
     with f_col4:
         show_archived = st.checkbox(f"Archived [{archived_groups_count}]", value=False)
 
