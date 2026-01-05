@@ -1192,32 +1192,17 @@ with tab_analytics:
              return (start, today)
         return []
 
-    # Filter State Management
+    # Filter State Management - Default to Week if not set, or keep existing
     if "an_preset" not in st.session_state: st.session_state.an_preset = "Week"
     
-    # UI: Smart Filter Bar (Presets)
-    # columns for button group
-    pb_cols = st.columns(6)
-    if pb_cols[0].button("Today", type="primary" if st.session_state.an_preset=="Today" else "secondary", use_container_width=True):
-        st.session_state.an_preset = "Today"
-        st.rerun()
-    if pb_cols[1].button("Week", type="primary" if st.session_state.an_preset=="Week" else "secondary", use_container_width=True):
-        st.session_state.an_preset = "Week"
-        st.rerun()
-    if pb_cols[2].button("Month", type="primary" if st.session_state.an_preset=="Month" else "secondary", use_container_width=True):
-        st.session_state.an_preset = "Month"
-        st.rerun()
-    if pb_cols[3].button("Year", type="primary" if st.session_state.an_preset=="Year" else "secondary", use_container_width=True):
-        st.session_state.an_preset = "Year"
-        st.rerun()
-    if pb_cols[4].button("All", type="primary" if st.session_state.an_preset=="All" else "secondary", use_container_width=True):
-        st.session_state.an_preset = "All"
-        st.rerun()
-    
-    # Calculate initial range from preset
+    # Calculate initial range from preset logic (optional, acts as default)
+    # We can keep using get_preset_dates for initialization if needed, 
+    # but since buttons are gone, maybe we just default to 'Today' or 'Week' once.
+    # Let's trust the session state or just default to empty if desired. 
+    # Current behavior: preset_range derives from 'an_preset'.
     preset_range = get_preset_dates(st.session_state.an_preset) if st.session_state.an_preset != "All" else []
     
-    # Row 2: Detailed Filters
+    # Row 1: Detailed Filters (No styling/titles)
     f_col1, f_col2, f_col3 = st.columns(3)
     
     # Category Filter
@@ -1244,16 +1229,14 @@ with tab_analytics:
         
         # FILTERS UI
         with f_col1:
-            # Date Range (Defaults to preset, but user can change)
-            # If user changes this, we technically diverge from preset.
-            date_range = st.date_input("📅 Date Range", value=preset_range, key="an_date_range")
+            date_range = st.date_input("Date Range", value=preset_range, key="an_date_range", label_visibility="collapsed")
             
         with f_col2:
             all_cats = sorted(list(set(df_log['Category'].dropna()))) if not df_log.empty else []
-            sel_cats = st.multiselect("🏷️ Category", all_cats, placeholder="All Categories")
+            sel_cats = st.multiselect("Category", all_cats, placeholder="All Categories", label_visibility="collapsed")
             
         with f_col3:
-            search_txt = st.text_input("🔍 Search", placeholder="ID or Task name...").lower()
+            search_txt = st.text_input("Search", placeholder="Search ID or Task...", label_visibility="collapsed").lower()
         
         # --- APPLY LOGIC ---
         if date_range:
