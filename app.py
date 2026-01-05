@@ -932,6 +932,7 @@ with tab_tracker:
     
     # Spacers removed to decrease area.
     # Custom CSS for strict alignment and compact vertical area
+    # Custom CSS for strict alignment and compact vertical area
     st.markdown("""
         <style>
         /* Force Input and Button to exact same height and alignment */
@@ -939,28 +940,29 @@ with tab_tracker:
             vertical-align: bottom;
         }
         .stTextInput input {
-            height: 42px !important;
-            min-height: 42px !important;
+            height: 35px !important;
+            min-height: 35px !important;
+            font-size: 0.9em;
         }
         .stButton button {
-            height: 42px !important;
-            min-height: 42px !important;
+            height: 35px !important;
+            min-height: 35px !important;
             padding-top: 0px !important;
             padding-bottom: 0px !important;
-            line-height: 42px !important;
+            line-height: 35px !important;
         }
         /* Reduce dividers margin */
         hr {
-            margin-top: 5px !important;
-            margin-bottom: 5px !important;
+            margin-top: 2px !important;
+            margin-bottom: 2px !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Structure: [Spacer, ID, Task, Button, Spacer]
-    # Alignment: "bottom" aligns the actual input box (ignoring invisible label) with the button.
+    # Structure: [ID, Task, Button, Spacer] 
+    # Left aligned by putting spacer at the end.
     
-    col_s1, col_id, col_task, col_btn, col_s2 = st.columns([0.5, 1.5, 5, 1.5, 0.5], vertical_alignment="bottom")
+    col_id, col_task, col_btn, col_spacer = st.columns([1.5, 5, 1.5, 2], vertical_alignment="bottom")
     
     with col_id:
         st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
