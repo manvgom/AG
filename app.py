@@ -1431,8 +1431,6 @@ with tab_analytics:
                 
                 # Altair Gantt
                 timeline_chart = alt.Chart(valid_sessions).mark_bar().encode(
-                    x=alt.X('hour(StartDT):O', title='Hour'), # Simplified X-axis for clarity? Or real time?
-                    # Real time timeline is better:
                     x=alt.X('StartDT:T', title='Time'),
                     x2='EndDT:T',
                     y=alt.Y('Category', title=None),
