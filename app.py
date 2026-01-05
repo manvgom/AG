@@ -1467,69 +1467,7 @@ with tab_analytics:
                 else:
                     st.info("No data for evolution.")
 
-            st.markdown("---")
-            
-            # -------------------------------------------------------
-            # 4. The Vital Few (Pareto Principle)
-            # -------------------------------------------------------
-            st.subheader("⚖️ The Vital Few (80/20 Rule)")
-            st.caption("Identify the 20% of tasks that consume 80% of your time.")
-            
-            # Pareto Data Prep
-            pareto_data = df_log.groupby(['ID', 'Task', 'Category'])['Hours'].sum().reset_index()
-            pareto_data = pareto_data.sort_values(by='Hours', ascending=False)
-            pareto_data['Cumulative Hours'] = pareto_data['Hours'].cumsum()
-            pareto_data['Total Hours'] = pareto_data['Hours'].sum()
-            pareto_data['Cumulative %'] = 100 * pareto_data['Cumulative Hours'] / pareto_data['Total Hours']
-            pareto_data['Label'] = pareto_data['ID'].astype(str) + ": " + pareto_data['Task']
-            
-            if not pareto_data.empty:
-                fig_pareto = go.Figure()
-                
-                # Bar Chart (Hours)
-                fig_pareto.add_trace(go.Bar(
-                    x=pareto_data['Label'],
-                    y=pareto_data['Hours'],
-                    name='Hours',
-                    marker_color='rgba(52, 152, 219, 0.8)',
-                    yaxis='y'
-                ))
-                
-                # Line Chart (Cumulative %)
-                fig_pareto.add_trace(go.Scatter(
-                    x=pareto_data['Label'],
-                    y=pareto_data['Cumulative %'],
-                    name='Cumulative %',
-                    mode='lines+markers',
-                    marker_color='rgba(231, 76, 60, 1)',
-                    yaxis='y2'
-                ))
-                
-                # 80% Threshold Line
-                fig_pareto.add_shape(type="line",
-                    x0=-0.5, y0=80, x1=len(pareto_data)-0.5, y1=80,
-                    line=dict(color="gray", width=1, dash="dash"),
-                    yref="y2"
-                )
-                
-                fig_pareto.update_layout(
-                    title="Task Pareto Analysis",
-                    xaxis=dict(title="Task"),
-                    yaxis=dict(title="Hours Invested"),
-                    yaxis2=dict(
-                        title="Cumulative %",
-                        overlaying='y',
-                        side='right',
-                        range=[0, 105]
-                    ),
-                    height=450,
-                    showlegend=True,
-                    legend=dict(x=0.8, y=0.9, bgcolor='rgba(255,255,255,0.5)')
-                )
-                
-                st.plotly_chart(fig_pareto, use_container_width=True)
-            else:
-                 st.info("Not enough data for Pareto.")
+
             
 
             
