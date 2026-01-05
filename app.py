@@ -938,32 +938,33 @@ with tab_tracker:
         <style>
         /* Force Input and Button to exact same height and alignment */
         div[data-testid="stHorizontalBlock"] > div {
-            vertical-align: bottom;
+            vertical-align: bottom; /* Aligns the bottom of the visible elements */
         }
         
-        /* Input Styling */
-        .stTextInput input {
-            height: 32px !important;
-            min-height: 32px !important;
+        /* Text Input: Target the container (border/bg) AND the inner input */
+        div[data-testid="stTextInput"] div[data-baseweb="input"] {
+            height: 35px !important;
+            min-height: 35px !important;
+            padding: 0px !important;
+        }
+        div[data-testid="stTextInput"] input {
+            height: 35px !important;
+            min-height: 35px !important;
             font-size: 14px !important;
-            padding-top: 0px !important;
-            padding-bottom: 0px !important;
-            box-sizing: border-box !important;
+            padding: 8px !important; /* Internal padding for text alignment */
         }
         
         /* Button Styling */
-        .stButton button {
-            height: 32px !important;
-            min-height: 32px !important;
+        div[data-testid="stButton"] button {
+            height: 35px !important;
+            min-height: 35px !important;
             padding-top: 0px !important;
             padding-bottom: 0px !important;
-            line-height: 32px !important;
-            box-sizing: border-box !important;
+            line-height: 35px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            margin-bottom: 0px !important; 
-            border: 1px solid rgba(250, 250, 250, 0.2); /* Match detailed input border if needed */
+            border: 1px solid rgba(250, 250, 250, 0.2);
         }
         
         /* Reduce dividers margin */
