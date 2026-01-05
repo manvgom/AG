@@ -291,9 +291,9 @@ def update_category(old_name, new_name, new_desc):
     
     st.toast(f"✅ Category updated: {old_name} -> {new_name}", icon="✨")
 
-def ensure_logs_loaded():
+def ensure_logs_loaded(force=False):
     """Ensure logs_data is loaded in session state."""
-    if "logs_data" not in st.session_state or st.session_state.logs_data is None:
+    if force or "logs_data" not in st.session_state or st.session_state.logs_data is None:
         try:
             gc = get_gc()
             secrets = find_credentials(st.secrets)
