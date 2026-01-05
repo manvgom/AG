@@ -1440,7 +1440,7 @@ with tab_analytics:
                     category_orders={"Day": days_order},
                     nbinsx=52 # Ensure weeks aren't bucketed too aggressively
                 )
-                fig_heat.update_layout(height=350, startup_title="Daily Intensity")
+                fig_heat.update_layout(height=350, title="Daily Intensity")
                 st.plotly_chart(fig_heat, use_container_width=True)
                 
             with c_evol:
