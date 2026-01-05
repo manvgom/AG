@@ -61,6 +61,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
+
+# Timezone
+MADRID_TZ = pytz.timezone('Europe/Madrid')
+
 # Added start_epoch for persistence, formatted_time for readability, archived/completion_date for lifecycle
 # Removed 'status' as per user request (Option A)
 # Updated to English Title Case Headers (Standardization)
@@ -736,7 +740,7 @@ def add_task():
 
     if task_name: # Redundant check but keeping logic structure
         # Capture current date
-        current_date = datetime.now().strftime("%d/%m/%Y")
+        current_date = datetime.now(MADRID_TZ).strftime("%d/%m/%Y")
 
         st.session_state.tasks.append({
             'id': task_id,
@@ -1226,7 +1230,9 @@ with tab_analytics:
                  # Or just Last 7 Days vs Previous 7 Days
                  # Let's use Last 7 Days relative to Today for simplicity if no filter
                  delta = 7
-                 today = datetime.now().date()
+                 # Let's use Last 7 Days relative to Today for simplicity if no filter
+                 delta = 7
+                 today = datetime.now(MADRID_TZ).date()
                  s = today - pd.Timedelta(days=6)
                  prev_s = s - pd.Timedelta(days=7)
                  prev_e = s - pd.Timedelta(days=1)
@@ -1264,7 +1270,7 @@ with tab_analytics:
             # We look at ALL data for streak, not just filtered
             unique_dates = sorted(list(set(full_df['Date'].dropna())), reverse=True)
             streak = 0
-            check_date = datetime.now().date()
+            check_date = datetime.now(MADRID_TZ).date()
             
             # Allow streak to continue if today is empty but yesterday wasn't
             if unique_dates and unique_dates[0] < check_date:
