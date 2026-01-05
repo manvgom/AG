@@ -1328,30 +1328,7 @@ with tab_analytics:
             st.markdown("---")
 
             # -------------------------------------------------------
-            # 3. Capital Allocation (Investment Portfolio)
-            # -------------------------------------------------------
-            st.subheader("💼 Capital Allocation (Time Investment)")
-            st.caption("Treat your time like a limited budget. Where are you investing?")
-            
-            # Prepare Data for Donut (Category Level)
-            cap_agg = df_log.groupby('Category')['Seconds'].sum().reset_index()
-            cap_agg['Hours'] = cap_agg['Seconds'] / 3600.0
-            cap_agg['Formatted'] = cap_agg['Seconds'].apply(format_time)
-            
-            # Donut Chart
-            chart_cap = alt.Chart(cap_agg).mark_arc(innerRadius=60).encode(
-                theta=alt.Theta(field="Hours", type="quantitative"),
-                color=alt.Color(field="Category", type="nominal"),
-                tooltip=['Category', alt.Tooltip('Formatted', title='Time')],
-                order=alt.Order("Hours", sort="descending")
-            ).properties(height=300)
-            
-            st.altair_chart(chart_cap, use_container_width=True)
-
-            st.markdown("---")
-            
-            # -------------------------------------------------------
-            # 4. Heatmap & Evolution
+            # 3. Heatmap & Evolution
             # -------------------------------------------------------
             c_heat, c_evol = st.columns(2)
             
