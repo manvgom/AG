@@ -1243,6 +1243,7 @@ with tab_analytics:
         # Parse Dates
         df_log['StartDT'] = pd.to_datetime(df_log['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
         df_log['Date'] = df_log['StartDT'].dt.date
+        df_log['Hour'] = df_log['StartDT'].dt.hour
         
         # --- APPLY FILTERS ---
         if date_range:
