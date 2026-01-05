@@ -931,21 +931,36 @@ with tab_tracker:
     # Using 'label_visibility="collapsed"'
     
     # Spacers removed to decrease area.
-    # Custom CSS to reduce margin of horizontal rules and ensure tight vertical stacking
+    # Custom CSS for strict alignment and compact vertical area
     st.markdown("""
         <style>
-        /* Tighter dividers */
+        /* Force Input and Button to exact same height and alignment */
+        div[data-testid="stHorizontalBlock"] > div {
+            vertical-align: bottom;
+        }
+        .stTextInput input {
+            height: 42px !important;
+            min-height: 42px !important;
+        }
+        .stButton button {
+            height: 42px !important;
+            min-height: 42px !important;
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
+            line-height: 42px !important;
+        }
+        /* Reduce dividers margin */
         hr {
-            margin-top: 1em;
-            margin-bottom: 1em;
+            margin-top: 5px !important;
+            margin-bottom: 5px !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
     # Structure: [Spacer, ID, Task, Button, Spacer]
-    # Ratio: 1 : 2 : 6 : 2 : 1
+    # Alignment: "bottom" aligns the actual input box (ignoring invisible label) with the button.
     
-    col_s1, col_id, col_task, col_btn, col_s2 = st.columns([0.5, 1.5, 5, 1.5, 0.5], vertical_alignment="center")
+    col_s1, col_id, col_task, col_btn, col_s2 = st.columns([0.5, 1.5, 5, 1.5, 0.5], vertical_alignment="bottom")
     
     with col_id:
         st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
