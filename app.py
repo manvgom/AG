@@ -885,6 +885,12 @@ def manage_categories_dialog():
 
 # Sidebar Logout & Settings
 with st.sidebar:
+    if st.button("🔄 Refresh Data", use_container_width=True):
+         ensure_logs_loaded(force=True)
+         # load_categories(force=True) # Optional, if we want to sync categories too
+         st.success("Data reloaded from cloud.")
+         st.rerun()
+         
     st.header("Configurations")
     
     # Category Management
@@ -1481,23 +1487,72 @@ with tab_analytics:
 with tab_logs:
     ensure_logs_loaded()
     
-    if "logs_data" in st.session_state and isinstance(st.session_state.logs_data, pd.DataFrame):
-        df_log = st.session_state.logs_data
+    if "logs_data" in st.session_state and isinstance(st.session_state.logs_data, pd.DataFrame) and not st.session_state.logs_data.empty:
+        df_log = st.session_state.logs_data.copy()
+        
+        # Prepare columns (reuse logic)
+        def parse_dur_log(x):
+            try:
+                parts = str(x).split(':')
+                if len(parts) == 3:
+                     h, m, s = map(int, parts)
+                     return h*3600 + m*60 + s
+            except:
+                pass
+            return 0.0
+            
+        df_log['Seconds'] = df_log['Duration'].apply(parse_dur_log)
+        df_log['Hours'] = df_log['Seconds'] / 3600.0
+        df_log['StartDT'] = pd.to_datetime(df_log['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+        df_log['Date'] = df_log['StartDT'].dt.date
+        
+        # Filters UI
+        f_col1, f_col2, f_col3 = st.columns(3)
+        with f_col1:
+            log_date_range = st.date_input("Date Range", value=[], key="log_date_range", label_visibility="collapsed")
+        with f_col2:
+            all_cats = sorted(list(set(df_log['Category'].dropna()))) if not df_log.empty else []
+            log_sel_cats = st.multiselect("Category", all_cats, placeholder="All Categories", key="log_cat_filter", label_visibility="collapsed")
+        with f_col3:
+            log_search = st.text_input("Search", placeholder="Search ID or Task...", key="log_search", label_visibility="collapsed").lower()
+            
+        # Apply Filters
+        if log_date_range:
+            if len(log_date_range) == 2:
+                s, e = log_date_range
+                df_log = df_log[(df_log['Date'] >= s) & (df_log['Date'] <= e)]
+            elif len(log_date_range) == 1:
+                df_log = df_log[df_log['Date'] == log_date_range[0]]
+                
+        if log_sel_cats:
+            df_log = df_log[df_log['Category'].isin(log_sel_cats)]
+            
+        if log_search:
+             df_log = df_log[
+                df_log['ID'].astype(str).str.lower().str.contains(log_search) | 
+                df_log['Task'].astype(str).str.lower().str.contains(log_search)
+            ]
+            
+        # Display
         if not df_log.empty:
-            # Show newest first
             st.dataframe(
                 df_log, 
                 use_container_width=True,
                 column_config={
-                   "Start Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
-                   "End Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
+                    "Start Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
+                    "End Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
+                     "Hours": st.column_config.NumberColumn(format="%.2f"),
+                     "Seconds": None, # Hide helper
+                     "StartDT": None,
+                     "Date": None
                 }
             )
         else:
-            st.info("No logs found yet.")
+             st.info("No logs match your filters.")
+    else:
+        st.info("No logs found yet.")
 
 # Auto-refresh if timer is running
 if st.session_state.active_task_idx is not None:
     time.sleep(1)
     st.rerun()
-
