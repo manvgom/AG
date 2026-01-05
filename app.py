@@ -1175,37 +1175,96 @@ with tab_analytics:
         df_log['Date'] = df_log['StartDT'].dt.date
         df_log['Hour'] = df_log['StartDT'].dt.hour
         
-        # Filter Logic
-        c_f1, c_f2, c_f3 = st.columns([1.5, 1.5, 2])
+    
+    # helper for presets
+    def get_preset_dates(option):
+        today = datetime.now(MADRID_TZ).date()
+        if option == "Today":
+            return (today, today)
+        elif option == "Week":
+            start = today - pd.Timedelta(days=today.weekday()) # Monday
+            return (start, today)
+        elif option == "Month":
+            start = today.replace(day=1)
+            return (start, today)
+        elif option == "Year":
+             start = today.replace(month=1, day=1)
+             return (start, today)
+        return []
+
+    # Filter State Management
+    if "an_preset" not in st.session_state: st.session_state.an_preset = "Week"
+    
+    # UI: Smart Filter Bar
+    f_col1, f_col2 = st.columns([2, 1])
+    with f_col1:
+         # Preset Buttons using columns for button group feel
+         pb1, pb2, pb3, pb4, pb5 = st.columns(5)
+         if pb1.button("Today", type="primary" if st.session_state.an_preset=="Today" else "secondary", use_container_width=True):
+             st.session_state.an_preset = "Today"
+             st.rerun()
+         if pb2.button("Week", type="primary" if st.session_state.an_preset=="Week" else "secondary", use_container_width=True):
+             st.session_state.an_preset = "Week"
+             st.rerun()
+         if pb3.button("Month", type="primary" if st.session_state.an_preset=="Month" else "secondary", use_container_width=True):
+             st.session_state.an_preset = "Month"
+             st.rerun()
+         if pb4.button("Year", type="primary" if st.session_state.an_preset=="Year" else "secondary", use_container_width=True):
+             st.session_state.an_preset = "Year"
+             st.rerun()
+         if pb5.button(" All ", type="primary" if st.session_state.an_preset=="All" else "secondary", use_container_width=True):
+             st.session_state.an_preset = "All"
+             st.rerun()
+             
+    # Calculate Date Range based on Preset
+    date_range = get_preset_dates(st.session_state.an_preset) if st.session_state.an_preset != "All" else []
+    
+    # Custom Override (optional, maybe later)
+    
+    # Category Filter
+    if "logs_data" in st.session_state and isinstance(st.session_state.logs_data, pd.DataFrame) and not st.session_state.logs_data.empty:
+        df_log = st.session_state.logs_data.copy()
         
-        with c_f1:
-             date_range = st.date_input("📅 Date Range", value=[], key="video_analytics_range")
-             
-        with c_f2:
-             # Load Categories for multiselect
-             all_cats = sorted(list(set(df_log['Category'].dropna())))
-             sel_cats = st.multiselect("🏷️ Category", all_cats, key="an_cat_filter")
-             
-        with c_f3:
-             search_txt = st.text_input("🔍 Search Task (ID/Desc)", key="an_search_filter").lower()
+        # Pre-process
+        # Clean Duration
+        def parse_dur(x):
+            try:
+                parts = str(x).split(':')
+                if len(parts) == 3:
+                     h, m, s = map(int, parts)
+                     return h*3600 + m*60 + s
+            except:
+                pass
+            return 0.0
             
+        df_log['Seconds'] = df_log['Duration'].apply(parse_dur)
+        df_log['Hours'] = df_log['Seconds'] / 3600.0
+        
+        # Parse Dates
+        df_log['StartDT'] = pd.to_datetime(df_log['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+        df_log['Date'] = df_log['StartDT'].dt.date
+        
+        # --- APPLY FILTERS ---
         if date_range:
-            if len(date_range) == 2:
-                s, e = date_range
-                df_log = df_log[(df_log['Date'] >= s) & (df_log['Date'] <= e)]
-            elif len(date_range) == 1:
-                df_log = df_log[df_log['Date'] == date_range[0]]
-                
+             s, e = date_range
+             df_log = df_log[(df_log['Date'] >= s) & (df_log['Date'] <= e)]
+             
+        # Category Filter UI
+        with f_col2:
+             all_cats = sorted(list(set(df_log['Category'].dropna()))) if not df_log.empty else []
+             sel_cats = st.multiselect("Category", all_cats, label_visibility="collapsed", placeholder="Filter Category...")
+             
         if sel_cats:
             df_log = df_log[df_log['Category'].isin(sel_cats)]
             
-        if search_txt:
-            # Match ID or Task
-            # Column headers were: ID, Task, ...
-            df_log = df_log[
-                df_log['ID'].astype(str).str.lower().str.contains(search_txt) | 
-                df_log['Task'].astype(str).str.lower().str.contains(search_txt)
-            ]
+        # Text Search
+        # (Could add text search back if requested, but removing for cleaner UI as agreed)
+        # Re-adding implicit search if needed, but for now strict Smart Bar
+        
+        if df_log.empty:
+             pass # Handled below
+    else:
+         df_log = pd.DataFrame() # Fallback
                 
         if df_log.empty:
             st.warning("No data for selected period.")
