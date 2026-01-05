@@ -958,7 +958,9 @@ with tab_tracker:
         filter_date = st.date_input("Date", value=[], label_visibility="collapsed")
     with f_col2:
         # Check if we have categories, else default
-        cat_options = st.session_state.get('categories_list', DEFAULT_CATEGORIES)
+        if 'categories_list' not in st.session_state: load_categories()
+        # Strictly available categories
+        cat_options = sorted(st.session_state.categories_list)
         filter_categories = st.multiselect("Category", cat_options, placeholder="Category", label_visibility="collapsed")
     with f_col3:
         search_query = st.text_input("Search", placeholder="Search ID or Task...", key="tracker_search", label_visibility="collapsed").lower()
