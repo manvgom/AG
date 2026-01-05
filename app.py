@@ -1455,7 +1455,7 @@ with tab_logs:
                 column_config={
                     "Start Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
                     "End Time": st.column_config.DatetimeColumn(format="D/M/YYYY HH:mm:ss"),
-                     "Hours": st.column_config.NumberColumn(format="%.2f"),
+                     "Hours": None,
                      "Seconds": None, # Hide helper
                      "StartDT": None,
                      "Date": None
