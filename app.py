@@ -48,7 +48,7 @@ st.markdown("""
     .stButton>button {
         width: 100%;
         border-radius: 5px;
-        height: 3em;
+        /* height: 3em; Removed to match default input height */
     }
     .stTextInput>div>div>input {
         border-radius: 5px;
@@ -930,7 +930,7 @@ with tab_tracker:
     # 3 columns: ID | Description | Add
     # Using 'label_visibility="collapsed"'
     
-    col0, col1, col2 = st.columns([1, 4, 1], vertical_alignment="bottom")
+    col0, col1, col2 = st.columns([1, 4, 1], vertical_alignment="center")
     with col0:
         st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
     with col1:
