@@ -933,24 +933,39 @@ with tab_tracker:
     # Spacers removed to decrease area.
     # Custom CSS for strict alignment and compact vertical area
     # Custom CSS for strict alignment and compact vertical area
+    # Custom CSS for strict alignment and compact vertical area
     st.markdown("""
         <style>
         /* Force Input and Button to exact same height and alignment */
         div[data-testid="stHorizontalBlock"] > div {
             vertical-align: bottom;
         }
+        
+        /* Input Styling */
         .stTextInput input {
-            height: 35px !important;
-            min-height: 35px !important;
-            font-size: 0.9em;
-        }
-        .stButton button {
-            height: 35px !important;
-            min-height: 35px !important;
+            height: 32px !important;
+            min-height: 32px !important;
+            font-size: 14px !important;
             padding-top: 0px !important;
             padding-bottom: 0px !important;
-            line-height: 35px !important;
+            box-sizing: border-box !important;
         }
+        
+        /* Button Styling */
+        .stButton button {
+            height: 32px !important;
+            min-height: 32px !important;
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
+            line-height: 32px !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin-bottom: 0px !important; 
+            border: 1px solid rgba(250, 250, 250, 0.2); /* Match detailed input border if needed */
+        }
+        
         /* Reduce dividers margin */
         hr {
             margin-top: 2px !important;
@@ -960,7 +975,7 @@ with tab_tracker:
     """, unsafe_allow_html=True)
 
     # Structure: [ID, Task, Button, Spacer] 
-    # Left aligned by putting spacer at the end.
+    # Left aligned.
     
     col_id, col_task, col_btn, col_spacer = st.columns([1.5, 5, 1.5, 2], vertical_alignment="bottom")
     
