@@ -1350,105 +1350,132 @@ with tab_analytics:
             st.markdown("---")
 
             # -------------------------------------------------------
-            # 2. Consistency Grid (Calendar Heatmap)
+            # 1. Executive Summary (High-Level KPIs)
             # -------------------------------------------------------
-            st.subheader("🗓️ Consistency Grid")
+            st.markdown("### 🦅 Executive Vision")
             
-            # Data prep: Sum hours per day
-            # We use full_df or df_log? If user drills down, grid should probably reflect selection.
-            # But the 'Consistency' argument usually implies 'All Activity'. 
-            # Let's stick to df_log (filtered) to allow drilling down "When did I work on Project X?".
+            # --- KPI 1: Weekly Velocity (Trend) ---
+            # We need broader context than just the filtered view for the trend.
+            # Default to last 12 weeks from full_df
+            full_df = st.session_state.logs_data.copy()
+            full_df['StartDT'] = pd.to_datetime(full_df['Start Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+            full_df['Date'] = full_df['StartDT'].dt.date
             
-            cal_agg = df_log.groupby('Date')['Hours'].sum().reset_index()
-            cal_agg['DurationStr'] = (cal_agg['Hours'] * 3600).apply(format_time)
+            # Calculate Week Start (Monday) for grouping
+            full_df['WeekStart'] = full_df['StartDT'].dt.to_period('W').apply(lambda r: r.start_time)
             
-            # Altair Heatmap: X=Week, Y=DayOfWeek
-            chart_cal = alt.Chart(cal_agg).mark_rect(stroke="white").encode(
-                x=alt.X('yearweek(Date):O', title='Week'),
-                y=alt.Y('day(Date):O', title='Day'),
-                color=alt.Color('Hours', scale=alt.Scale(scheme='greens'), title='Hours'),
-                tooltip=[
-                    alt.Tooltip('Date', title='Date'),
-                    alt.Tooltip('DurationStr', title='Time')
-                ]
-            ).properties(height=150)
+            # Group by Week
+            velocity_agg = full_df.groupby('WeekStart')['Duration'].apply(lambda x: pd.to_timedelta(x).sum().total_seconds() / 3600.0).reset_index()
+            velocity_agg.columns = ['Week', 'Hours']
             
-            st.altair_chart(chart_cal, use_container_width=True)
-            st.markdown("---")
+            # Filter to last 12 weeks so it's readable
+            twelve_weeks_ago = pd.Timestamp.now() - pd.Timedelta(weeks=12)
+            velocity_agg = velocity_agg[velocity_agg['Week'] >= twelve_weeks_ago]
+            
+            velocity_chart = alt.Chart(velocity_agg).mark_line(point=True, color='#2ECC71').encode(
+                x=alt.X('Week:T', title='Week', axis=alt.Axis(format='%d %b')),
+                y=alt.Y('Hours', title='Total Hours'),
+                tooltip=[alt.Tooltip('Week', format='%d %b'), 'Hours']
+            ).properties(title="Weekly Velocity (Last 12 Weeks)", height=200)
 
-            # -------------------------------------------------------
-            # 3. Daily Activity Trend (Bar Chart)
-            # -------------------------------------------------------
-
-            # -------------------------------------------------------
-            # Row 2: Hourly Productivity Heatmap
-            # -------------------------------------------------------
-            st.subheader("🔥 Peak Productivity Hours")
-            # Group by Hour (0-23)
-            hourly_agg = df_log.groupby('Hour')['Hours'].sum().reset_index()
-            hourly_agg['DurationStr'] = (hourly_agg['Hours'] * 3600).apply(format_time)
+            # --- KPI 2: Strategic Focus (Stacked Bar 100%) ---
+            # Group by Week + Category
+            strategy_agg = full_df.groupby(['WeekStart', 'Category'])['Duration'].apply(lambda x: pd.to_timedelta(x).sum().total_seconds() / 3600.0).reset_index()
+            strategy_agg.columns = ['Week', 'Category', 'Hours']
+            strategy_agg = strategy_agg[strategy_agg['Week'] >= twelve_weeks_ago]
             
-            chart_hourly = alt.Chart(hourly_agg).mark_bar(color="#ff9f43").encode(
-                x=alt.X('Hour', title='Hour of Day (0-23)', scale=alt.Scale(domain=[0, 23])),
-                y=alt.Y('Hours', title='Total Hours Worked'),
-                tooltip=['Hour', alt.Tooltip('DurationStr', title='Time')]
-            ).properties(height=250)
+            strategy_chart = alt.Chart(strategy_agg).mark_bar().encode(
+                x=alt.X('Week:T', title='Week'),
+                y=alt.Y('Hours', stack='normalize', title='Focus Distribution %'),
+                color='Category',
+                tooltip=['Week', 'Category', 'Hours']
+            ).properties(title="Strategic Focus Evolution", height=200)
             
-            st.altair_chart(chart_hourly, use_container_width=True)
-            st.markdown("---")
-
-            # -------------------------------------------------------
-            # 4. Time River (Category -> Project Flow)
-            # -------------------------------------------------------
-            st.subheader("🌊 Time River (Context Breakdown)")
+            # --- KPI 3: Focus Quality Score ---
+            # Define Deep Work session > 45 mins (2700 seconds)
+            # We calculate this on the FILTERED data (df_log) to see quality of CURRENT selection
+            df_log['Seconds'] = df_log['Duration'].apply(parse_dur) # Ensure seconds column exists
+            deep_work_seconds = df_log[df_log['Seconds'] >= 2700]['Seconds'].sum()
+            total_seconds = df_log['Seconds'].sum()
+            quality_score = (deep_work_seconds / total_seconds * 100) if total_seconds > 0 else 0
             
-            # Group by Category AND Project (ID + Task)
-            river_agg = df_log.groupby(['Category', 'ID', 'Task'])['Hours'].sum().reset_index()
-            river_agg['Project'] = river_agg['ID'] + ": " + river_agg['Task']
-            river_agg['DurationStr'] = (river_agg['Hours'] * 3600).apply(format_time)
+            # Render Executive Row
+            c_exec1, c_exec2, c_exec3 = st.columns([2, 2, 1])
+            with c_exec1: st.altair_chart(velocity_chart, use_container_width=True)
+            with c_exec2: st.altair_chart(strategy_chart, use_container_width=True)
+            with c_exec3: 
+                st.metric("Focus Quality Score", f"{quality_score:.1f}%", help="% Time in sessions > 45 min")
+                st.progress(quality_score / 100)
             
-            # Stacked Bar: X=Hours, Y=Category, Color=Project
-            chart_river = alt.Chart(river_agg).mark_bar().encode(
-                x=alt.X('Hours', title='Total Hours', stack='zero'),
-                y=alt.Y('Category', title='Category'),
-                color=alt.Color('Project', title='Project', legend=alt.Legend(orient="bottom", columns=3)),
-                tooltip=[
-                    alt.Tooltip('Category', title='Category'),
-                    alt.Tooltip('Project', title='Project'),
-                    alt.Tooltip('DurationStr', title='Time')
-                ]
-            ).properties(height=350)
-            
-            st.altair_chart(chart_river, use_container_width=True)
             st.markdown("---")
             
             # -------------------------------------------------------
-            # 5. Deep Dive: Project Leaderboard
+            # 2. Pragmatic Action (Daily Detail)
             # -------------------------------------------------------
-            st.subheader("🏆 Project Leaderboard")
+            st.markdown("### ⚡ Pragmatic Action")
             
-            proj_lead = df_log.groupby(['ID', 'Task', 'Category'])['Hours'].sum().reset_index()
-            total_h = proj_lead['Hours'].sum()
-            proj_lead['% Total'] = (proj_lead['Hours'] / total_h)
-            proj_lead['Duration'] = (proj_lead['Hours'] * 3600).apply(format_time)
+            # Tab Structure for detailed views
+            t_prag1, t_prag2, t_prag3 = st.tabs(["⏳ Timeline", "🏗️ Effort Matrix", "🧘 Deep Work"])
             
-            proj_lead = proj_lead.sort_values('Hours', ascending=False).reset_index(drop=True)
-            
-            # Display as interactive dataframe with Progress Column
-            st.dataframe(
-                proj_lead[['ID', 'Task', 'Category', 'Duration', '% Total']],
-                column_config={
-                    "% Total": st.column_config.ProgressColumn(
-                        "Impact",
-                        format="%.1f%%",
-                        min_value=0,
-                        max_value=1,
-                    ),
-                    "Duration": st.column_config.TextColumn("Time Logged"),
-                },
-                use_container_width=True,
-                hide_index=True
-            )
+            with t_prag1:
+                # --- VIEW 1: Session Timeline (Gantt) ---
+                st.caption("Visualize your day's fragmentation. Are you working in blocks or scattered?")
+                
+                # We need Start and End times as datetime objects
+                # df_log has 'StartDT' already. We need EndDT.
+                # End Time is string in sheet usually.
+                df_log['EndDT'] = pd.to_datetime(df_log['End Time'], format="%d/%m/%Y %H:%M:%S", errors='coerce')
+                
+                # If EndDT is missing (active task?), skip or handle
+                valid_sessions = df_log.dropna(subset=['StartDT', 'EndDT']).copy()
+                
+                # Altair Gantt
+                timeline_chart = alt.Chart(valid_sessions).mark_bar().encode(
+                    x=alt.X('hour(StartDT):O', title='Hour'), # Simplified X-axis for clarity? Or real time?
+                    # Real time timeline is better:
+                    x=alt.X('StartDT:T', title='Time'),
+                    x2='EndDT:T',
+                    y=alt.Y('Category', title=None),
+                    color='Category',
+                    tooltip=['Task', 'Start Time', 'End Time', 'Duration']
+                ).properties(height=300)
+                
+                st.altair_chart(timeline_chart, use_container_width=True)
+                
+            with t_prag2:
+                # --- VIEW 2: Effort Matrix (Pivot) ---
+                st.caption("The 'Timesheet' view. Hours spent per Task per Day.")
+                
+                pivot_df = df_log.copy()
+                pivot_df['DateStr'] = pivot_df['StartDT'].dt.strftime('%Y-%m-%d')
+                
+                # Pivot: Index=Task, Columns=Date, Values=Hours
+                matrix = pivot_df.pivot_table(index=['Category', 'Task'], columns='DateStr', values='Hours', aggfunc='sum', fill_value=0)
+                
+                # Styling: Heatmap-like background? (Streamlit allows limited styling)
+                # Let's just show the clean dataframe
+                st.dataframe(matrix, use_container_width=True)
+                
+            with t_prag3:
+                # --- VIEW 3: Deep Work Leaderboard ---
+                st.caption("Gamifying Focus. Top individual sessions sorted by duration.")
+                
+                # Sort by Seconds descending
+                deep_df = df_log.sort_values('Seconds', ascending=False).reset_index(drop=True)
+                
+                # Formatting
+                deep_df['Rank'] = deep_df.index + 1
+                deep_df['Session'] = deep_df['Duration']
+                
+                st.dataframe(
+                    deep_df[['Rank', 'Category', 'Task', 'Date', 'Start Time', 'Session']],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Rank": st.column_config.NumberColumn("🏆", width="small"),
+                        "Session": st.column_config.TextColumn("Duration")
+                    }
+                )
 
 
 
