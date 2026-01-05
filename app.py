@@ -1320,44 +1320,9 @@ with tab_analytics:
             
             st.markdown("---")
 
-            # -------------------------------------------------------
-            # 1. Quality KPIs (The "Health" Check)
-            # -------------------------------------------------------
-            st.markdown("### 🩺 Pulse Check")
-            
-            # Prepare Data
+            # Prepare Data (Global for Analytics)
             df_log['Seconds'] = df_log['Duration'].apply(parse_dur)
             df_log['Hours'] = df_log['Seconds'] / 3600.0
-            
-            # A. Deep Work Ratio (% time in sessions > 45min)
-            deep_seconds = df_log[df_log['Seconds'] >= 2700]['Seconds'].sum()
-            total_seconds_kpi = df_log['Seconds'].sum()
-            deep_ratio = (deep_seconds / total_seconds_kpi * 100) if total_seconds_kpi > 0 else 0
-            
-            # B. Context Cost (Sessions per Hour)
-            total_hours_kpi = total_seconds_kpi / 3600.0
-            total_sessions = len(df_log)
-            context_cost = (total_sessions / total_hours_kpi) if total_hours_kpi > 0 else 0
-            
-            # C. Top Category Domination (% of total time)
-            if not df_log.empty:
-                top_cat_agg = df_log.groupby('Category')['Seconds'].sum().sort_values(ascending=False)
-                if not top_cat_agg.empty:
-                    top_cat_name = top_cat_agg.index[0]
-                    top_cat_pct = (top_cat_agg.iloc[0] / total_seconds_kpi * 100)
-                else:
-                    top_cat_name = "-"
-                    top_cat_pct = 0
-            else:
-                top_cat_name = "-"
-                top_cat_pct = 0
-            
-            k1, k2, k3 = st.columns(3)
-            k1.metric("🧠 Deep Work Ratio", f"{deep_ratio:.1f}%", help="% Time in sessions > 45 min. Aim for >50%.")
-            k2.metric("⚡ Context Cost", f"{context_cost:.1f} /hr", help="Switches per hour. Lower is better.")
-            k3.metric(f"🏆 Top Focus: {top_cat_name}", f"{top_cat_pct:.1f}%", help="Percent of total time on top category.")
-            
-            st.markdown("---")
 
             # -------------------------------------------------------
             # 2. The "Flow" (Sankey Diagram)
