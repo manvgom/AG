@@ -1265,6 +1265,7 @@ with tab_analytics:
          df_log = pd.DataFrame() # Fallback 
                 
     if df_log.empty:
+        st.warning("No data for selected period.")
     else:
             # -------------------------------------------------------
             # 1. KPIs Section (Restored)
