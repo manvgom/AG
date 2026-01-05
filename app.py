@@ -930,18 +930,21 @@ with tab_tracker:
     # 3 columns: ID | Description | Add
     # Using 'label_visibility="collapsed"'
     
-    # Spacers for vertical centering between Header and Divider
-    st.write("") 
+    # Spacers removed to decrease area.
+    # Using columns with side spacers to center horizontally and "decrease area" (width).
     
-    col0, col1, col2 = st.columns([1, 4, 1], vertical_alignment="center")
-    with col0:
+    # Structure: [Spacer, ID, Task, Button, Spacer]
+    # Ratio: 1 : 2 : 6 : 2 : 1
+    
+    col_s1, col_id, col_task, col_btn, col_s2 = st.columns([1, 1.5, 5, 1.5, 1], vertical_alignment="center")
+    
+    with col_id:
         st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
-    with col1:
+    with col_task:
         st.text_input("Task", key="new_task_input", placeholder="New Task Description...", label_visibility="collapsed")
-    with col2:
+    with col_btn:
         st.button("Add Task", on_click=add_task, use_container_width=True)
 
-    st.write("")
     st.markdown("---") # Minimalist separation
 
     # Filters
