@@ -730,34 +730,44 @@ def unarchive_group(group_id, group_name):
     save_tasks()
     # st.rerun() # Removed: No-op in callback
 
-def add_task():
-    task_id = st.session_state.get("new_task_id", "").strip()
-    task_name = st.session_state.get("new_task_input", "").strip()
-    # Default category if none selected (since input removed)
-    task_category = "Otros" 
+@st.dialog("➕ New Task")
+def create_task_dialog():
+    st.write("Enter details for the new task.")
     
-    if not task_id or not task_name:
-        st.toast("⚠️ Please fill in ID and Description", icon="⚠️")
-        return
+    # Inputs
+    new_id = st.text_input("Task ID", placeholder="e.g. T-123")
+    new_task = st.text_input("Task Description", placeholder="e.g. Fix login bug...")
+    
+    # Category Selection
+    # Ensure categories are loaded
+    if 'categories_list' not in st.session_state:
+        load_categories()
+    categories = st.session_state.categories_list
+    new_cat = st.selectbox("Category", categories, index=0)
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Cancel", use_container_width=True):
+        st.rerun()
+        
+    if col2.button("Create Task", type="primary", use_container_width=True):
+        if not new_id or not new_task:
+            st.error("Please fill in ID and Description.")
+        else:
+            # Custom logic to add task directly without using session state keys
+            current_date = datetime.now(MADRID_TZ).strftime("%d/%m/%Y")
+            st.session_state.tasks.append({
+                'id': new_id,
+                'name': new_task,
+                'category': new_cat,
+                'total_seconds': 0,
+                'start_epoch': 0.0,
+                'notes': "",
+                'created_date': current_date
+            })
+            save_tasks()
+            st.rerun()
 
-    if task_name: # Redundant check but keeping logic structure
-        # Capture current date
-        current_date = datetime.now(MADRID_TZ).strftime("%d/%m/%Y")
-
-        st.session_state.tasks.append({
-            'id': task_id,
-            'name': task_name,
-            'category': task_category,
-            'total_seconds': 0,
-            'start_epoch': 0.0,
-            'notes': "",
-            'created_date': current_date
-            # 'status': "To Do" # Removed
-        })
-        st.session_state.new_task_input = "" 
-        # st.session_state.new_category_input = "" # Removed
-        st.session_state.new_task_id = "" # Clear ID
-        save_tasks()
+# Old add_task function removed as it is replaced by dialog logic
 
 # Old delete helpers removed in favor of dialog logic
 
@@ -923,74 +933,8 @@ st.markdown("---")
 tab_tracker, tab_analytics, tab_logs = st.tabs(["⏱️ Tracker", "📊 Analytics", "📜 Logs"])
 
 with tab_tracker:
-    # Input Section
-    # Minimalist differentiator: Divider + Container style or just plain collapsed inputs with placeholder.
-    # User asked for "minimalist differentiation". Let's use a subheader/caption or just spacing.
-    # Also collapsed labels as requested.
-
-    # 3 columns: ID | Description | Add
-    # Using 'label_visibility="collapsed"'
+    # Input Section REMOVED (Replaced by Dialog)
     
-    # Spacers removed to decrease area.
-    # Custom CSS for strict alignment and compact vertical area
-    # Custom CSS for strict alignment and compact vertical area
-    # Custom CSS for strict alignment and compact vertical area
-    st.markdown("""
-        <style>
-        /* Force Input and Button to exact same height and alignment */
-        div[data-testid="stHorizontalBlock"] > div {
-            vertical-align: bottom; /* Aligns the bottom of the visible elements */
-        }
-        
-        /* Text Input: Target the container (border/bg) AND the inner input */
-        div[data-testid="stTextInput"] div[data-baseweb="input"] {
-            height: 35px !important;
-            min-height: 35px !important;
-            padding: 0px !important;
-        }
-        div[data-testid="stTextInput"] input {
-            height: 35px !important;
-            min-height: 35px !important;
-            font-size: 14px !important;
-            padding: 8px !important; /* Internal padding for text alignment */
-        }
-        
-        /* Button Styling */
-        div[data-testid="stButton"] button {
-            height: 35px !important;
-            min-height: 35px !important;
-            padding-top: 0px !important;
-            padding-bottom: 0px !important;
-            line-height: 35px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            border: 1px solid rgba(250, 250, 250, 0.2);
-        }
-        
-        /* Reduce dividers margin */
-        hr {
-            margin-top: 2px !important;
-            margin-bottom: 2px !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # Structure: [ID, Task, Button, Spacer] 
-    # Left aligned.
-    
-    col_id, col_task, col_btn, col_spacer = st.columns([1.5, 5, 1.5, 2], vertical_alignment="bottom")
-    
-    with col_id:
-        st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
-    with col_task:
-        st.text_input("Task", key="new_task_input", placeholder="New Task Description...", label_visibility="collapsed")
-    with col_btn:
-        st.button("Add Task", on_click=add_task, use_container_width=True)
-
-    st.markdown("---") # Minimalist separation
-
-    # Filters
     # Filters
     # Calculate unique archived groups count first
     archived_groups_count = 0
@@ -1001,8 +945,14 @@ with tab_tracker:
                  arch_pairs.add((t.get('id', '').strip(), t.get('name', '').strip()))
          archived_groups_count = len(arch_pairs)
 
-    f_col1, f_col2, f_col3, f_col4 = st.columns([1.5, 1.5, 2, 1], vertical_alignment="center")
+    # Integrated Layout: [New Task Btn] [Date] [Category] [Search] [Archive]
+    # Adjust columns to fit
+    f_col_new, f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.5, 1.5, 2, 1], vertical_alignment="center")
     
+    with f_col_new:
+        if st.button("➕ New Task", type="primary", use_container_width=True):
+            create_task_dialog()
+            
     # Order matched to Analytics/Logs: Date -> Category -> Search (-> Archive)
     with f_col1:
         filter_date = st.date_input("Date", value=[], label_visibility="collapsed")
