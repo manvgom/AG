@@ -1358,26 +1358,40 @@ with tab_analytics:
             # -------------------------------------------------------
             # 2. Capital Allocation (Investment Portfolio)
             # -------------------------------------------------------
+            # -------------------------------------------------------
+            # 2. Capital Allocation (Investment Portfolio)
+            # -------------------------------------------------------
             st.subheader("💼 Capital Allocation (Time Investment)")
-            st.caption("Detailed investment by Task. Where is the budget going?")
+            st.caption("Treat your time like a limited budget. Where are you investing?")
             
-            # Prepare Data: Group by ID+Task to show granular allocation
-            df_log['Seconds'] = df_log['Duration'].apply(parse_dur)
-            cap_agg = df_log.groupby(['ID', 'Task', 'Category'])['Seconds'].sum().reset_index()
+            # Prepare Data for Donut (Category Level)
+            cap_agg = df_log.groupby('Category')['Seconds'].sum().reset_index()
             cap_agg['Hours'] = cap_agg['Seconds'] / 3600.0
             
-            # Create a combined label for the chart
-            cap_agg['Label'] = cap_agg['ID'].astype(str) + ": " + cap_agg['Task']
-            
-            # Detailed Bar Chart
-            chart_cap = alt.Chart(cap_agg).mark_bar().encode(
-                x=alt.X('Hours', title='Total Hours Invested'),
-                y=alt.Y('Label', title='Task (ID)', sort='-x'),
-                color=alt.Color('Category', title='Category'),
-                tooltip=['ID', 'Task', 'Category', alt.Tooltip('Hours', format='.2f')]
-            ).properties(height=max(300, len(cap_agg) * 20)) # Dynamic height
+            # Donut Chart
+            chart_cap = alt.Chart(cap_agg).mark_arc(innerRadius=60).encode(
+                theta=alt.Theta(field="Hours", type="quantitative"),
+                color=alt.Color(field="Category", type="nominal"),
+                tooltip=['Category', alt.Tooltip('Hours', format='.1f')],
+                order=alt.Order("Hours", sort="descending")
+            ).properties(height=300)
             
             st.altair_chart(chart_cap, use_container_width=True)
+            
+            st.markdown("### 📦 Detailed Task Breakdown")
+            # Table with ID/Task info (Shipping Manifest style)
+            manifest = df_log.groupby(['ID', 'Task', 'Category'])['Seconds'].sum().reset_index()
+            manifest['Hours'] = manifest['Seconds'] / 3600.0
+            manifest = manifest.sort_values('Hours', ascending=False)
+            
+            st.dataframe(
+                manifest[['ID', 'Task', 'Category', 'Hours']],
+                use_container_width=True,
+                column_config={
+                     "Hours": st.column_config.NumberColumn(format="%.2f h"),
+                },
+                hide_index=True
+            )
             
             st.markdown("---")
 
