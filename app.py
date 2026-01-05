@@ -6,7 +6,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 import altair as alt
 import pytz
-
+import plotly.express as px
+import plotly.graph_objects as go
 # Page configuration
 st.set_page_config(page_title="Tasks Monitor", page_icon="🖥️", layout="wide")
 
@@ -1320,24 +1321,151 @@ with tab_analytics:
             st.markdown("---")
 
             # -------------------------------------------------------
-            # 2. Capital Allocation (Investment Portfolio)
+            # 1. Quality KPIs (The "Health" Check)
             # -------------------------------------------------------
-            st.subheader("💼 Capital Allocation (Time Investment)")
-            st.caption("Treat your time like a limited budget. Where are you investing?")
+            st.markdown("### 🩺 Pulse Check")
             
-            # Prepare Data for Donut (Category Level)
-            cap_agg = df_log.groupby('Category')['Seconds'].sum().reset_index()
-            cap_agg['Hours'] = cap_agg['Seconds'] / 3600.0
+            # Prepare Data
+            df_log['Seconds'] = df_log['Duration'].apply(parse_dur)
+            df_log['Hours'] = df_log['Seconds'] / 3600.0
             
-            # Donut Chart
-            chart_cap = alt.Chart(cap_agg).mark_arc(innerRadius=60).encode(
-                theta=alt.Theta(field="Hours", type="quantitative"),
-                color=alt.Color(field="Category", type="nominal"),
-                tooltip=['Category', alt.Tooltip('Hours', format='.1f')],
-                order=alt.Order("Hours", sort="descending")
-            ).properties(height=300)
+            # A. Deep Work Ratio (% time in sessions > 45min)
+            deep_seconds = df_log[df_log['Seconds'] >= 2700]['Seconds'].sum()
+            total_seconds_kpi = df_log['Seconds'].sum()
+            deep_ratio = (deep_seconds / total_seconds_kpi * 100) if total_seconds_kpi > 0 else 0
             
-            st.altair_chart(chart_cap, use_container_width=True)
+            # B. Context Cost (Sessions per Hour)
+            total_hours_kpi = total_seconds_kpi / 3600.0
+            total_sessions = len(df_log)
+            context_cost = (total_sessions / total_hours_kpi) if total_hours_kpi > 0 else 0
+            
+            # C. Top Category Domination (% of total time)
+            if not df_log.empty:
+                top_cat_agg = df_log.groupby('Category')['Seconds'].sum().sort_values(ascending=False)
+                if not top_cat_agg.empty:
+                    top_cat_name = top_cat_agg.index[0]
+                    top_cat_pct = (top_cat_agg.iloc[0] / total_seconds_kpi * 100)
+                else:
+                    top_cat_name = "-"
+                    top_cat_pct = 0
+            else:
+                top_cat_name = "-"
+                top_cat_pct = 0
+            
+            k1, k2, k3 = st.columns(3)
+            k1.metric("🧠 Deep Work Ratio", f"{deep_ratio:.1f}%", help="% Time in sessions > 45 min. Aim for >50%.")
+            k2.metric("⚡ Context Cost", f"{context_cost:.1f} /hr", help="Switches per hour. Lower is better.")
+            k3.metric(f"🏆 Top Focus: {top_cat_name}", f"{top_cat_pct:.1f}%", help="Percent of total time on top category.")
+            
+            st.markdown("---")
+
+            # -------------------------------------------------------
+            # 2. The "Flow" (Sankey Diagram)
+            # -------------------------------------------------------
+            st.subheader("🌊 Time Flow (Category ➔ Task)")
+            st.caption("Where does your time actually go? Follow the stream.")
+            
+            # Sankey Data Prep
+            # Nodes: Categories + Tasks
+            # Links: Category -> Task
+            
+            # 1. Aggregation
+            sankey_data = df_log.groupby(['Category', 'Task'])['Hours'].sum().reset_index()
+            sankey_data = sankey_data[sankey_data['Hours'] > 0] # Filter zeros
+            
+            if not sankey_data.empty:
+                # 2. Create Node Lists
+                all_cats = list(sankey_data['Category'].unique())
+                all_tasks = list(sankey_data['Task'].unique())
+                
+                # Combine nodes: Categories first, then Tasks.
+                # Note: If a Task name is same as Category name, it confuses Plotly. Prepend/Append info.
+                node_labels = all_cats + all_tasks
+                node_map = {label: i for i, label in enumerate(node_labels)}
+                
+                # 3. Create Links
+                sources = [node_map[row['Category']] for _, row in sankey_data.iterrows()]
+                targets = [node_map[row['Task']] for _, row in sankey_data.iterrows()]
+                values = sankey_data['Hours'].tolist()
+                
+                # 4. Plot
+                fig_sankey = go.Figure(data=[go.Sankey(
+                    node = dict(
+                      pad = 15,
+                      thickness = 20,
+                      line = dict(color = "black", width = 0.5),
+                      label = node_labels,
+                      color = "rgba(46, 204, 113, 0.5)" # Generic Greenish
+                    ),
+                    link = dict(
+                      source = sources,
+                      target = targets,
+                      value = values,
+                      color = "rgba(200, 200, 200, 0.3)" # Subtle grey links
+                  ))])
+                
+                fig_sankey.update_layout(title_text="", font_size=12, height=400, margin=dict(l=0, r=0, t=10, b=10))
+                st.plotly_chart(fig_sankey, use_container_width=True)
+            else:
+                st.info("Not enough data for Flow Chart.")
+
+            st.markdown("---")
+            
+            # -------------------------------------------------------
+            # 3. Heatmap & Evolution
+            # -------------------------------------------------------
+            c_heat, c_evol = st.columns(2)
+            
+            with c_heat:
+                st.subheader("🔥 Intensity Map")
+                # Prepare Data: Date, Hours
+                heat_data = df_log.groupby('Date')['Hours'].sum().reset_index()
+                
+                # Basic Plotly Heatmap (Calendar-like)
+                # We'll use a simple scatter or bar if proper calendar is hard, 
+                # but let's try a heatmap on Week vs DayOfWeek
+                heat_data['Date'] = pd.to_datetime(heat_data['Date'])
+                heat_data['Week'] = heat_data['Date'].dt.isocalendar().week
+                heat_data['Day'] = heat_data['Date'].dt.day_name()
+                
+                # Order days
+                days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                
+                fig_heat = px.density_heatmap(
+                    heat_data, 
+                    x="Week", 
+                    y="Day", 
+                    z="Hours", 
+                    color_continuous_scale="Greens",
+                    category_orders={"Day": days_order},
+                    nbinsx=52 # Ensure weeks aren't bucketed too aggressively
+                )
+                fig_heat.update_layout(height=350, startup_title="Daily Intensity")
+                st.plotly_chart(fig_heat, use_container_width=True)
+                
+            with c_evol:
+                st.subheader("📈 Strategy Evolution")
+                # Stacked Bar: Week vs Hours, Color=Category
+                # Use FULL data for evolution to show trend, filters apply if user wants focused view, 
+                # but usually evolution is best on broad scope. Let's respect filters though.
+                
+                # We need 'WeekStart'
+                df_log['WeekStart'] = df_log['StartDT'].dt.to_period('W').apply(lambda r: r.start_time)
+                evol_data = df_log.groupby(['WeekStart', 'Category'])['Hours'].sum().reset_index()
+                
+                if not evol_data.empty:
+                    fig_evol = px.bar(
+                        evol_data, 
+                        x="WeekStart", 
+                        y="Hours", 
+                        color="Category", 
+                        title="",
+                        labels={"WeekStart": "Week", "Hours": "Total Hours"}
+                    )
+                    fig_evol.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                    st.plotly_chart(fig_evol, use_container_width=True)
+                else:
+                    st.info("No data for evolution.")
             
 
             
