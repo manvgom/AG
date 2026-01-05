@@ -727,7 +727,8 @@ def unarchive_group(group_id, group_name):
             t['completion_date'] = ""
             
     save_tasks()
-    st.rerun()
+    save_tasks()
+    # st.rerun() # Removed: No-op in callback
 
 def add_task():
     task_id = st.session_state.get("new_task_id", "").strip()
