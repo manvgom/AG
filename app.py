@@ -947,6 +947,71 @@ with tab_tracker:
 
     # Integrated Layout: [New Task Btn] [Date] [Category] [Search] [Archive]
     # Adjust columns to fit
+    
+    st.markdown("""
+        <style>
+        /* General alignment for the row */
+        div[data-testid="stHorizontalBlock"] {
+            align-items: center !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div {
+            vertical-align: middle !important;
+        }
+        
+        /* Force height unification to 35px for all input types */
+        
+        /* Text Input (Search) */
+        div[data-testid="stTextInput"] div[data-baseweb="input"] {
+            height: 35px !important;
+            min-height: 35px !important;
+            padding: 0px !important;
+        }
+        div[data-testid="stTextInput"] input {
+            height: 35px !important;
+            min-height: 35px !important;
+            padding: 8px !important;
+        }
+
+        /* Date Input */
+        div[data-testid="stDateInput"] div[data-baseweb="input"] {
+            height: 35px !important;
+            min-height: 35px !important;
+        }
+        
+        /* MultiSelect (Category) - Tricky, often has chips. Force container height matches */
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {
+             min-height: 35px !important;
+             border-color: rgba(250, 250, 250, 0.2) !important;
+        }
+        
+        /* Button (New Task) */
+        div[data-testid="stButton"] button {
+            height: 35px !important;
+            min-height: 35px !important;
+            padding: 0px !important;
+            line-height: 35px !important;
+            border: 1px solid rgba(250, 250, 250, 0.2);
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        /* Checkbox alignment */
+        label[data-testid="stCheckbox"] {
+            min-height: 35px !important;
+            height: 35px !important;
+            align-items: center !important;
+            display: flex !important;
+        }
+        
+        /* Reduce dividers margin */
+        hr {
+            margin-top: 2px !important;
+            margin-bottom: 2px !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     f_col_new, f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.5, 1.5, 2, 1], vertical_alignment="center")
     
     with f_col_new:
@@ -954,8 +1019,10 @@ with tab_tracker:
             create_task_dialog()
             
     # Order matched to Analytics/Logs: Date -> Category -> Search (-> Archive)
+    # Order matched to Analytics/Logs: Date -> Category -> Search (-> Archive)
     with f_col1:
         filter_date = st.date_input("Date", value=[], label_visibility="collapsed")
+    with f_col2:
         # Check if we have categories, else default
         if 'categories_list' not in st.session_state: load_categories()
         
