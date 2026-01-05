@@ -931,12 +931,21 @@ with tab_tracker:
     # Using 'label_visibility="collapsed"'
     
     # Spacers removed to decrease area.
-    # Using columns with side spacers to center horizontally and "decrease area" (width).
-    
+    # Custom CSS to reduce margin of horizontal rules and ensure tight vertical stacking
+    st.markdown("""
+        <style>
+        /* Tighter dividers */
+        hr {
+            margin-top: 1em;
+            margin-bottom: 1em;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # Structure: [Spacer, ID, Task, Button, Spacer]
     # Ratio: 1 : 2 : 6 : 2 : 1
     
-    col_s1, col_id, col_task, col_btn, col_s2 = st.columns([1, 1.5, 5, 1.5, 1], vertical_alignment="center")
+    col_s1, col_id, col_task, col_btn, col_s2 = st.columns([0.5, 1.5, 5, 1.5, 0.5], vertical_alignment="center")
     
     with col_id:
         st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
