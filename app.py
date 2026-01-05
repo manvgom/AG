@@ -1378,20 +1378,7 @@ with tab_analytics:
             
             st.altair_chart(chart_cap, use_container_width=True)
             
-            st.markdown("### 📦 Detailed Task Breakdown")
-            # Table with ID/Task info (Shipping Manifest style)
-            manifest = df_log.groupby(['ID', 'Task', 'Category'])['Seconds'].sum().reset_index()
-            manifest['Hours'] = manifest['Seconds'] / 3600.0
-            manifest = manifest.sort_values('Hours', ascending=False)
-            
-            st.dataframe(
-                manifest[['ID', 'Task', 'Category', 'Hours']],
-                use_container_width=True,
-                column_config={
-                     "Hours": st.column_config.NumberColumn(format="%.2f h"),
-                },
-                hide_index=True
-            )
+
             
             st.markdown("---")
 
