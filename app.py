@@ -930,6 +930,9 @@ with tab_tracker:
     # 3 columns: ID | Description | Add
     # Using 'label_visibility="collapsed"'
     
+    # Spacers for vertical centering between Header and Divider
+    st.write("") 
+    
     col0, col1, col2 = st.columns([1, 4, 1], vertical_alignment="center")
     with col0:
         st.text_input("ID", key="new_task_id", placeholder="New ID", label_visibility="collapsed")
@@ -938,6 +941,7 @@ with tab_tracker:
     with col2:
         st.button("Add Task", on_click=add_task, use_container_width=True)
 
+    st.write("")
     st.markdown("---") # Minimalist separation
 
     # Filters
