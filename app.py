@@ -1268,7 +1268,7 @@ with tab_analytics:
                 
     if df_log.empty:
         st.warning("No data for selected period.")
-        else:
+    else:
             # -------------------------------------------------------
             # 1. KPIs Section
             # -------------------------------------------------------
