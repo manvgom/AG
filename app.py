@@ -945,7 +945,7 @@ with tab_tracker:
 
     f_col1, f_col2, f_col3, f_col4 = st.columns([2, 1.5, 1.5, 1.2], vertical_alignment="center")
     with f_col1:
-        search_query = st.text_input("Search", placeholder="Search ID or Task...", label_visibility="collapsed").lower()
+        search_query = st.text_input("Search", placeholder="Search ID or Task...", key="tracker_search", label_visibility="collapsed").lower()
     with f_col2:
         # Check if we have categories, else default
         cat_options = st.session_state.get('categories_list', DEFAULT_CATEGORIES)
@@ -1245,7 +1245,7 @@ with tab_analytics:
             sel_cats = st.multiselect("Category", all_cats, placeholder="All Categories", label_visibility="collapsed")
             
         with f_col3:
-            search_txt = st.text_input("Search", placeholder="Search ID or Task...", label_visibility="collapsed").lower()
+            search_txt = st.text_input("Search", placeholder="Search ID or Task...", key="analytics_search", label_visibility="collapsed").lower()
         
         # --- APPLY LOGIC ---
         if date_range:
