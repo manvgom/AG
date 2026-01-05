@@ -5,6 +5,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 import altair as alt
+import pytz
 
 # Page configuration
 st.set_page_config(page_title="Tasks Monitor", page_icon="🖥️", layout="wide")
@@ -605,8 +606,16 @@ def log_session(task_id, task_name, category, elapsed_seconds, start_epoch, end_
             ])
             
         # Format Timestamps: DD/MM/AAAA HH:MM:SS
-        start_dt = datetime.fromtimestamp(start_epoch)
-        end_dt = datetime.fromtimestamp(end_epoch)
+        # Explicitly convert to Europe/Madrid
+        madrid_tz = pytz.timezone('Europe/Madrid')
+        
+        # fromtimestamp returns naive local time of server. 
+        # Better to strictly use utcfromtimestamp -> localize UTC -> convert to Madrid
+        start_utc = datetime.utcfromtimestamp(start_epoch).replace(tzinfo=pytz.utc)
+        end_utc = datetime.utcfromtimestamp(end_epoch).replace(tzinfo=pytz.utc)
+        
+        start_dt = start_utc.astimezone(madrid_tz)
+        end_dt = end_utc.astimezone(madrid_tz)
         
         start_str = start_dt.strftime("%d/%m/%Y %H:%M:%S")
         end_str = end_dt.strftime("%d/%m/%Y %H:%M:%S")
