@@ -401,12 +401,14 @@ def load_tasks():
             
             clean_row = {
                 'id': str(row.get('ID') or row.get('id', '')),
+                'parent_id': str(row.get('Parent ID') or row.get('parent_id', '')),
                 'name': str(row.get('Task') or row.get('name', '')),
                 'category': str(row.get('Category') or row.get('category', '')),
                 'total_seconds': total_sec,
                 'start_epoch': start_ep,
                 'notes': str(row.get('Notes') or row.get('notes', '')),
                 'created_date': str(row.get('Date Created') or row.get('created_date', '')),
+                'archived': str(row.get('Archived') or row.get('archived', 'False')).lower() == 'true',
                 'archived': str(row.get('Archived') or row.get('archived', 'False')).lower() == 'true',
                 'completion_date': str(row.get('Date Archived') or row.get('completion_date', ''))
             }
@@ -518,27 +520,33 @@ def notes_dialog(index):
             new_text = f"{now_str}: "
         st.session_state[f"note_temp_{index}"] = new_text
         
-    # Timestamp Button
-    if st.button("📅 Add Timestamp", key=f"ts_btn_{index}"):
-        insert_timestamp()
-        
-    # Text Input
-    new_notes = st.text_area(
-        "Content",
-        value=st.session_state.get(f"note_temp_{index}", ""),
-        height=300,
-        key=f"note_temp_{index}",
-        placeholder="Type details, updates, or logs here..."
-    )
+    tab_edit, tab_preview = st.tabs(["✏️ Edit", "👁️ Preview"])
     
-    if st.button("Save Notes", type="primary", use_container_width=True):
-        st.session_state.tasks[index]['notes'] = new_notes
-        # Clean temp key to avoid stale data next open? 
-        # Actually session state persists, so we should update it or clear it.
-        # Clearing it ensures next open pulls from 'tasks' again.
-        del st.session_state[f"note_temp_{index}"]
-        save_tasks()
-        st.rerun()
+    with tab_edit:
+        # Timestamp Button
+        if st.button("📅 Add Timestamp", key=f"ts_btn_{index}"):
+            insert_timestamp()
+            
+        # Text Input
+        new_notes = st.text_area(
+            "Content",
+            height=300,
+            key=f"note_temp_{index}",
+            placeholder="Type details, updates, or logs here... \nUse Markdown for code:\n```python\nprint('Hello')\n```"
+        )
+        
+        if st.button("Save Notes", type="primary", use_container_width=True):
+            st.session_state.tasks[index]['notes'] = new_notes
+            del st.session_state[f"note_temp_{index}"]
+            save_tasks()
+            st.rerun()
+
+    with tab_preview:
+        current_content = st.session_state.get(f"note_temp_{index}", "")
+        if current_content:
+            st.markdown(current_content)
+        else:
+            st.info("No notes to preview.")
 
 @st.dialog("➕ Add New Category to Task")
 def add_sibling_task_dialog(task_id, task_name):
@@ -560,10 +568,22 @@ def add_sibling_task_dialog(task_id, task_name):
             st.error("Please select a category.")
             return
 
+        # Check for duplicates
+        is_duplicate = False
+        for t in st.session_state.tasks:
+            if (t.get('id', '') == task_id and 
+                t.get('name', '') == task_name and 
+                t.get('category', '') == new_cat):
+                is_duplicate = True
+                break
+        
+        if is_duplicate:
+            st.error(f"Category '{new_cat}' already exists for this task.")
+            return
+
         current_date = datetime.now().strftime("%d/%m/%Y")
         
-        # Determine status. Default To Do.
-        
+        # Default status: To Do
         new_task = {
             'id': task_id,
             'name': task_name,
@@ -730,6 +750,30 @@ def unarchive_group(group_id, group_name):
     save_tasks()
     # st.rerun() # Removed: No-op in callback
 
+@st.dialog("⚠️ Delete Project")
+def delete_group_confirmation(group_id, group_name):
+    st.write(f"Are you sure you want to delete **{group_id} - {group_name}**?")
+    st.warning("This will delete ALL categories and history for this task.")
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Cancel", use_container_width=True):
+        st.rerun()
+        
+    if col2.button("Delete Forever", type="primary", use_container_width=True):
+        # Stop timer if active task belongs to this group
+        if st.session_state.active_task_idx is not None:
+             active_t = st.session_state.tasks[st.session_state.active_task_idx]
+             if active_t.get('id', '') == group_id and active_t.get('name', '') == group_name:
+                 st.session_state.active_task_idx = None
+                 st.session_state.start_time = None
+        
+        # Remove all tasks matching ID and Name
+        new_tasks = [t for t in st.session_state.tasks if not (t.get('id', '') == group_id and t.get('name', '') == group_name)]
+        st.session_state.tasks = new_tasks
+        
+        save_tasks()
+        st.rerun()
+
 @st.dialog("➕ New Task")
 def create_task_dialog():
     st.write("Enter details for the new task.")
@@ -738,34 +782,55 @@ def create_task_dialog():
     new_id = st.text_input("Task ID", placeholder="e.g. T-123")
     new_task = st.text_input("Task Description", placeholder="e.g. Fix login bug...")
     
-    # Category Selection
-    # Ensure categories are loaded
-    if 'categories_list' not in st.session_state:
-        load_categories()
-    categories = st.session_state.categories_list
-    new_cat = st.selectbox("Category", categories, index=0)
+    
+    # Category Selection - REMOVED (Per User Request - create empty task first)
+    # Just ensure empty category for initialization
+    new_cat = ""
+    
+    # Parent Task Selection - REMOVED (Moved to Edit)
+    # Tags Input - REMOVED (Moved to Edit)
     
     col1, col2 = st.columns(2)
     if col1.button("Cancel", use_container_width=True):
         st.rerun()
         
     if col2.button("Create Task", type="primary", use_container_width=True):
-        if not new_id or not new_task:
-            st.error("Please fill in ID and Description.")
+        if not new_task:
+            st.error("Please fill in Description.")
         else:
-            # Custom logic to add task directly without using session state keys
-            current_date = datetime.now(MADRID_TZ).strftime("%d/%m/%Y")
-            st.session_state.tasks.append({
-                'id': new_id,
-                'name': new_task,
-                'category': new_cat,
-                'total_seconds': 0,
-                'start_epoch': 0.0,
-                'notes': "",
-                'created_date': current_date
-            })
-            save_tasks()
-            st.rerun()
+            # OPTIONAL ID LOGIC
+            final_id = new_id.strip() if new_id.strip() else "GENERAL"
+            
+            # Wrapper for creation logic
+            pass
+            
+            # Check for duplicates (Empty category check)
+            is_duplicate = False
+            for t in st.session_state.tasks:
+                if (t.get('id', '') == final_id and 
+                    t.get('name', '') == new_task and 
+                    t.get('category', '') == ""):
+                    is_duplicate = True
+                    break
+            
+            if is_duplicate:
+                st.error(f"Task '{new_task}' already exists.")
+            else:
+                # Custom logic to add task directly without using session state keys
+                current_date = datetime.now(MADRID_TZ).strftime("%d/%m/%Y")
+                st.session_state.tasks.append({
+                    'id': final_id,
+                    'name': new_task,
+                    'category': "", # Empty category
+                    'total_seconds': 0,
+                    'start_epoch': 0.0,
+                    'notes': "",
+                    'created_date': current_date,
+                    'created_date': current_date,
+                    'created_date': current_date
+                })
+                save_tasks()
+                st.rerun()
 
 # Old add_task function removed as it is replaced by dialog logic
 
@@ -873,7 +938,7 @@ def manage_categories_dialog():
         # Ensure desc map exists
         if 'categories_desc' not in st.session_state: st.session_state.categories_desc = {}
         
-        for cat in st.session_state.categories_list:
+        for cat in list(st.session_state.categories_list):
             desc = st.session_state.categories_desc.get(cat, "")
             
             c1, c2, c3 = st.columns([3.5, 0.75, 0.75], vertical_alignment="center")
@@ -930,7 +995,8 @@ st.title("🖥️ Tasks Tracker")
 st.markdown("---")
 
 # Tabs
-tab_tracker, tab_analytics, tab_logs = st.tabs(["⏱️ Tracker", "📊 Analytics", "📜 Logs"])
+# Tabs
+tab_tracker, tab_analytics, tab_logs, tab_structure = st.tabs(["⏱️ Tracker", "📊 Analytics", "📜 Logs", "🗺️ Structure"])
 
 with tab_tracker:
     # Input Section REMOVED (Replaced by Dialog)
@@ -1104,7 +1170,10 @@ with tab_tracker:
                 groups[key].append((idx, task))
             
             # Loop through groups
-            for (g_id, g_name), g_tasks in groups.items():
+            # SORTING LOGIC: Always sort by ID (A-Z)
+            sorted_items = sorted(list(groups.items()), key=lambda x: x[0][0])
+            
+            for (g_id, g_name), g_tasks in sorted_items:
                 # Check coverage math
                 total_subtasks = len(g_tasks)
                 completed_subtasks = sum(1 for _, t in g_tasks if t.get('status') == 'Done')
@@ -1141,18 +1210,16 @@ with tab_tracker:
                 is_expanded = ((len(groups) == 1) or running_in_group) and not show_archived
                 
                 with st.expander(header_str, expanded=is_expanded):
-                    # Header row for the group content
-                    # Col widths: Category, Date, Duration, Action, Edit, Note, Del
-                    # Header row for the group content
-                    # Col widths: Category, Duration, Action, Edit, Note, Del
-                    # Previous was [2.5, 1.2, 1.5, ...]. Removed 1.2 (Date). Added to Category -> 3.7
                     if g_tasks:
                         # h_cols = st.columns([3.7, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         # h_cols[0].markdown("**Category**") # Removed
                         # h_cols[1].markdown("**Duration**") # Removed
                         pass
-                    
+                
+                    # Content (Task Rows)
                     for idx, task in g_tasks:
+                        # if not task.get('category'): continue # FIXED: Don't skip tasks without category
+                        
                         r_cols = st.columns([3.7, 1.5, 0.7, 0.7, 0.7, 0.7], vertical_alignment="center")
                         
                         # Category
@@ -1163,21 +1230,13 @@ with tab_tracker:
                         else:
                              r_cols[0].text(cat_name)
                         
-                        # Date Removed
-                        # r_cols[1].text(task.get('created_date', '-'))
-                        
+                        # Duration
                         is_running = (idx == st.session_state.active_task_idx)
-                        
-                        # Duration Calculation
-                        try:
-                            raw_val = str(task.get('total_seconds', 0.0) or 0.0).replace(',', '.')
-                            current_total = float(raw_val)
-                        except:
-                            current_total = 0.0
+                        try: current_total = float(str(task.get('total_seconds', 0.0)).replace(',', '.'))
+                        except: current_total = 0.0
                         
                         if is_running:
-                            start_t = st.session_state.start_time or time.time()
-                            current_total += (time.time() - start_t)
+                            current_total += (time.time() - (st.session_state.start_time or time.time()))
                         
                         dur_str = format_time(current_total)
                         if is_running:
@@ -1188,35 +1247,20 @@ with tab_tracker:
                         # Buttons
                         btn_label = "⏹️" if is_running else "▶️"
                         btn_type = "primary" if is_running else "secondary"
-                        # No more blocked button by status
                         
-                        r_cols[2].button(
-                            btn_label, 
-                            key=f"btn_{idx}", 
-                            type=btn_type, 
-                            on_click=toggle_timer, 
-                            args=(idx,), 
-                            use_container_width=True,
-                            disabled=show_archived # Disable play if archived
-                        )
+                        r_cols[2].button(btn_label, key=f"t_btn_{idx}", type=btn_type, on_click=toggle_timer, args=(idx,), use_container_width=True, disabled=show_archived)
                         
-                            
-                        if r_cols[3].button("✏️", key=f"edit_btn_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True, disabled=show_archived):
-                            pass
-
-                        # Notes Button - Dynamic Icon
                         has_notes = bool(task.get('notes', '').strip())
                         note_icon = "📝" if has_notes else "📄"
+                        r_cols[3].button(note_icon, key=f"t_note_{idx}", on_click=notes_dialog, args=(idx,), use_container_width=True)
                         
-                        r_cols[4].button(note_icon, key=f"note_btn_{idx}", on_click=notes_dialog, args=(idx,), use_container_width=True)
-                        
-                        if r_cols[5].button("🗑️", key=f"del_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True):
-                            pass
-                    
+                        if r_cols[4].button("✏️", key=f"t_edit_{idx}", on_click=edit_task_dialog, args=(idx,), use_container_width=True, disabled=show_archived): pass
+                        if r_cols[5].button("🗑️", key=f"t_del_row_{idx}", type="secondary", on_click=delete_confirmation, args=(idx,), use_container_width=True): pass
+
                     st.write("") # Spacer
                     
-                    # Footer: Left = Add Category, Right = Archive
-                    f_col1, f_col2 = st.columns([1, 1], vertical_alignment="bottom")
+                    # Footer: Left = Add Cat, Center=Archive, Right=Delete?
+                    f_col1, f_col2, f_col3 = st.columns([1, 1, 1], vertical_alignment="bottom")
                     
                     with f_col1:
                         if not show_archived:
@@ -1224,14 +1268,14 @@ with tab_tracker:
                                 add_sibling_task_dialog(g_id, g_name)
                     
                     with f_col2:
-                        # Use container to align right? Streamlit columns justify content left by default.
-                        # We can just put it in the second column.
-                        if show_archived:
-                             st.button("📂 Unarchive Project", key=f"unarch_{g_id}_{g_name}", on_click=unarchive_group, args=(g_id, g_name), use_container_width=True)
-                        else:
-                             st.button("📦 Archive Project", key=f"arch_{g_id}_{g_name}", on_click=archive_confirmation, args=(g_id, g_name), use_container_width=True)
-                
-        st.markdown("---")
+                         if show_archived:
+                             st.button("📂 Unarchive", key=f"unarch_{g_id}_{g_name}", on_click=unarchive_group, args=(g_id, g_name), use_container_width=True)
+                         else:
+                             st.button("📦 Archive", key=f"arch_{g_id}_{g_name}", on_click=archive_confirmation, args=(g_id, g_name), use_container_width=True)
+                    
+                    with f_col3:
+                        if st.button("🗑️ Delete", key=f"del_grp_{g_id}_{g_name}", type="secondary", use_container_width=True):
+                            delete_group_confirmation(g_id, g_name)
 
 with tab_analytics:
     # Ensure data is loaded
@@ -1363,16 +1407,18 @@ with tab_analytics:
             df_log['Hours'] = df_log['Seconds'] / 3600.0
 
             # -------------------------------------------------------
-            # 2. The "Flow" (Sankey Diagram)
+            # 1. The "Flow" (Sankey Diagram)
             # -------------------------------------------------------
             st.subheader("🌊 Time Flow (Category ➔ Task)")
-            st.caption("Where does your time actually go? Follow the stream.")
             
             # Sankey Data Prep
             sankey_data = df_log.groupby(['Category', 'Task'])['Seconds'].sum().reset_index()
             sankey_data = sankey_data[sankey_data['Seconds'] > 0] 
             
             if not sankey_data.empty:
+                # Calculate Total Flow calculation for %
+                total_flow_seconds = sankey_data['Seconds'].sum()
+                sankey_data['Percentage'] = (sankey_data['Seconds'] / total_flow_seconds) * 100
                 sankey_data['Formatted'] = sankey_data['Seconds'].apply(format_time)
                 
                 all_cats = list(sankey_data['Category'].unique())
@@ -1382,12 +1428,17 @@ with tab_analytics:
                 
                 sources = [node_map[row['Category']] for _, row in sankey_data.iterrows()]
                 targets = [node_map[row['Task']] for _, row in sankey_data.iterrows()]
-                values = (sankey_data['Seconds'] / 3600.0).tolist() # Visual thickness still needs valid numeric
-                custom_data = sankey_data['Formatted'].tolist() # For tooltip
+                values = (sankey_data['Seconds'] / 3600.0).tolist() # Visual thickness
                 
-                # Note: Sankey hovertemplate is tricky for links vs nodes. 
-                # We will just try to simplify or use standard values, but user wants HH:MM:SS.
-                # Plotly Sankey shows "value" by default. We can replace it with customdata.
+                # Prepare Custom Data: [formatted_time, percentage]
+                # We need to map it carefully or just pre-format a string?
+                # Sankey customdata must be list (or array) of length equal to links.
+                # Let's format the hover string directly here for clarity?
+                # Actually, Plotly suggests passing raw data and formatting in template.
+                # Let's pass list of lists: [[time, pct], [time, pct]...]
+                
+                # Zip to list of lists
+                custom_data = sankey_data[['Formatted', 'Percentage']].values.tolist()
                 
                 fig_sankey = go.Figure(data=[go.Sankey(
                     node = dict(
@@ -1396,15 +1447,14 @@ with tab_analytics:
                       line = dict(color = "black", width = 0.5),
                       label = node_labels,
                       color = "rgba(46, 204, 113, 0.5)",
-                      # We'd need to pre-calculate node total time for HH:MM:SS on nodes, skipping for now to keep it simple or doing it right?
-                      # Let's do links first which is the "flow".
                     ),
                     link = dict(
                       source = sources,
                       target = targets,
                       value = values,
                       customdata = custom_data,
-                      hovertemplate='Source: %{source.label}<br>Target: %{target.label}<br>Time: %{customdata}<extra></extra>',
+                      # %{customdata[0]} = Formatted Time, %{customdata[1]} = Percentage (raw float)
+                      hovertemplate='Source: %{source.label}<br>Target: %{target.label}<br>Time: %{customdata[0]}<br>Share: %{customdata[1]:.1f}%<extra></extra>',
                       color = "rgba(200, 200, 200, 0.3)" 
                   ))])
                 
@@ -1416,59 +1466,96 @@ with tab_analytics:
             st.markdown("---")
 
             # -------------------------------------------------------
+            # 2. Heatmap & Evolution
+            # -------------------------------------------------------
+            # Stacked Vertically (Full Width)
+
+            # -------------------------------------------------------
             # 3. Heatmap & Evolution
             # -------------------------------------------------------
-            c_heat, c_evol = st.columns(2)
+            st.subheader("🔥 Intensity Map")
+            # Prepare Data: Date, Hours
+            heat_data = df_log.groupby('Date')['Seconds'].sum().reset_index()
+            heat_data['Hours'] = heat_data['Seconds'] / 3600.0
+            heat_data['Formatted'] = heat_data['Seconds'].apply(format_time)
             
-            with c_heat:
-                st.subheader("🔥 Intensity Map")
-                # Prepare Data: Date, Hours
-                heat_data = df_log.groupby('Date')['Seconds'].sum().reset_index()
-                heat_data['Hours'] = heat_data['Seconds'] / 3600.0
-                heat_data['Formatted'] = heat_data['Seconds'].apply(format_time)
+            heat_data['Date'] = pd.to_datetime(heat_data['Date'])
+            heat_data['WeekStart'] = heat_data['Date'].dt.to_period('W').apply(lambda r: r.start_time)
+            # Format to "06 Jan"
+            heat_data['WeekLabel'] = heat_data['WeekStart'].dt.strftime("%d %b")
+            heat_data['Day'] = heat_data['Date'].dt.day_name()
+            
+            days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            # Create full grid for Heatmap
+            if not heat_data.empty:
+                 # Pivot on WeekLabel (Formatted String)
+                 # We must carry sorting by also pivoting on WeekStart and then replacing index? 
+                 # Easier: Just pivot on `WeekLabel`. Sorting relies on `x` argument in Heatmap.
+                 
+                 # To ensure correct sort order of "06 Jan", "13 Jan", we need unique list sorted by date
+                 week_map = heat_data[['WeekStart', 'WeekLabel']].drop_duplicates().sort_values('WeekStart')
+                 sorted_labels = week_map['WeekLabel'].tolist()
+                 
+                 z_matrix = heat_data.pivot(index='Day', columns='WeekLabel', values='Hours').reindex(index=days_order, columns=sorted_labels)
+                 text_matrix = heat_data.pivot(index='Day', columns='WeekLabel', values='Formatted').reindex(index=days_order, columns=sorted_labels).fillna("0s")
+                 
+                 z_values = z_matrix.fillna(0).values
+                 
+                 fig_heat = go.Figure(data=go.Heatmap(
+                     z=z_values,
+                     x=z_matrix.columns, # Now these are strings "06 Jan", "13 Jan"
+                     y=z_matrix.index,
+                     colorscale="Greens",
+                     customdata=text_matrix.values,
+                     hovertemplate='Week Starting: %{x}<br>Day: %{y}<br>Time: %{customdata}<extra></extra>'
+                 ))
+                 fig_heat.update_xaxes(title_text="Week Starting")
+            else:
+                 fig_heat = go.Figure()
+
+            fig_heat.update_layout(height=350, title="Daily Intensity")
+            st.plotly_chart(fig_heat, use_container_width=True)
+            
+            st.markdown("---")
                 
-                heat_data['Date'] = pd.to_datetime(heat_data['Date'])
-                heat_data['Week'] = heat_data['Date'].dt.isocalendar().week
-                heat_data['Day'] = heat_data['Date'].dt.day_name()
+            st.subheader("📈 Strategy Evolution")
+            df_log['WeekStart'] = df_log['StartDT'].dt.to_period('W').apply(lambda r: r.start_time)
+            # Format to "06 Jan"
+            df_log['WeekLabel'] = df_log['WeekStart'].dt.strftime("%d %b")
+            
+            evol_data = df_log.groupby(['WeekLabel', 'WeekStart', 'Category'])['Seconds'].sum().reset_index()
+            evol_data['Hours'] = evol_data['Seconds'] / 3600.0
+            evol_data['Formatted'] = evol_data['Seconds'].apply(format_time)
+            
+            if not evol_data.empty:
+                # Sort by WeekStart to ensure chart order
+                evol_data = evol_data.sort_values('WeekStart')
                 
-                days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                
-                fig_heat = px.density_heatmap(
-                    heat_data, 
-                    x="Week", 
-                    y="Day", 
-                    z="Hours", 
-                    color_continuous_scale="Greens",
-                    category_orders={"Day": days_order},
-                    nbinsx=52,
-                    hover_data=['Formatted']
+                fig_evol = px.bar(
+                    evol_data, 
+                    x="WeekLabel", 
+                    y="Hours", 
+                    color="Category", 
+                    title="",
+                    labels={"WeekLabel": "Week Starting", "Hours": "Total Hours"},
+                    hover_data=['Formatted', 'Category']
                 )
-                fig_heat.update_traces(hovertemplate='Week: %{x}<br>Day: %{y}<br>Time: %{customdata[0]}<extra></extra>')
-                fig_heat.update_layout(height=350, title="Daily Intensity")
-                st.plotly_chart(fig_heat, use_container_width=True)
+                # Force X-axis order (otherwise it sorts alphabetically by "06 Jan", "13 Jan")
+                # Lucky: Date formats starting with Day often don't sort chronologically if months differ!
+                # e.g. "01 Feb" comes before "31 Jan" alphabetically. 
+                # Must use category_orders.
+                unique_weeks = evol_data.sort_values('WeekStart')['WeekLabel'].unique().tolist()
                 
-            with c_evol:
-                st.subheader("📈 Strategy Evolution")
-                df_log['WeekStart'] = df_log['StartDT'].dt.to_period('W').apply(lambda r: r.start_time)
-                evol_data = df_log.groupby(['WeekStart', 'Category'])['Seconds'].sum().reset_index()
-                evol_data['Hours'] = evol_data['Seconds'] / 3600.0
-                evol_data['Formatted'] = evol_data['Seconds'].apply(format_time)
+                # Also sort Legend by Category if desired, or let Plotly handle.
                 
-                if not evol_data.empty:
-                    fig_evol = px.bar(
-                        evol_data, 
-                        x="WeekStart", 
-                        y="Hours", 
-                        color="Category", 
-                        title="",
-                        labels={"WeekStart": "Week", "Hours": "Total Hours"},
-                        hover_data=['Formatted', 'Category']
-                    )
-                    fig_evol.update_traces(hovertemplate='Week: %{x}<br>Category: %{customdata[1]}<br>Time: %{customdata[0]}<extra></extra>')
-                    fig_evol.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                    st.plotly_chart(fig_evol, use_container_width=True)
-                else:
-                    st.info("No data for evolution.")
+                fig_evol.update_xaxes(categoryorder='array', categoryarray=unique_weeks)
+                
+                fig_evol.update_traces(hovertemplate='Week: %{x}<br>Category: %{customdata[1]}<br>Time: %{customdata[0]}<extra></extra>')
+                fig_evol.update_layout(height=350, showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                st.plotly_chart(fig_evol, use_container_width=True)
+            else:
+                st.info("No data for evolution.")
 
 
             
@@ -1547,7 +1634,163 @@ with tab_logs:
     else:
         st.info("No logs found yet.")
 
+
+
 # Auto-refresh if timer is running
 if st.session_state.active_task_idx is not None:
     time.sleep(1)
     st.rerun()
+
+with tab_structure:
+    st.subheader("🗺️ Executive Structure")
+    
+    if not st.session_state.tasks:
+        st.info("No tasks to visualize.")
+    else:
+        # Build Hierarchy: Category -> Project -> Tasks
+        
+        # 1. Pre-calculate Totals per Task (Self + Children)
+        # Actually, simpler: Build tree dict first.
+        # Tree Structure: { Category: { ParentID/Name: { 'self': task_obj, 'children': [task_objs] } } }
+        
+        hierarchy = {}
+        
+        # Helper to find children
+        # But 'tasks' is a flat list.
+        # Let's map IDs to objects for easy lookup
+        task_map = {t.get('id', ''): t for t in st.session_state.tasks if t.get('id')}
+        
+        # Group by Category
+        cats = sorted(list({t.get('category') or "Uncategorized" for t in st.session_state.tasks}))
+        
+        for cat in cats:
+            # Get all tasks in this category
+            cat_tasks = [t for t in st.session_state.tasks if (t.get('category') or "Uncategorized") == cat]
+            
+            # Separate Roots (Projects or Independent) vs Children
+            # A Root is a task that has NO parent OR its parent is NOT in this category (edge case?)
+            # Valid Parent-Child is usually within same category or cross-category.
+            # If Child is in Cat A, Parent in Cat B -> Where do show it?
+            # Executive View usually groups by the *Child's* category or the *Project's*?
+            # Let's assume standard: Show under *current* category.
+            
+            roots = []
+            orphan_children = [] # Should not happen if parent exists
+            
+            # Map of ParentID -> [Children]
+            children_map = {}
+            for t in cat_tasks:
+                pid = t.get('parent_id')
+                if pid:
+                    if pid not in children_map: children_map[pid] = []
+                    children_map[pid].append(t)
+                else:
+                    roots.append(t)
+                    
+            # Now we have roots. Some roots might correspond to Parents of children *in this category*.
+            # But what if a Parent is in another category?
+            # For simplicity: We render roots. If a root is a "Project" (has children anywhere), we show expander.
+            
+            # We need a calculation function
+            def get_total_time(t_obj):
+                # Self time
+                s = t_obj.get('total_seconds', 0)
+                # Children time
+                t_id = t_obj.get('id', '')
+                if t_id:
+                     # Find all tasks where parent_id == t_id
+                     # (Global search to support cross-category linkage)
+                     kids = [k for k in st.session_state.tasks if k.get('parent_id') == t_id]
+                     for k in kids:
+                         s += k.get('total_seconds', 0) # Just 1 level deep for now? Or recursive?
+                         # If we want full recursion:
+                         # s += get_total_time(k) - k.get('total_seconds', 0) # tricky
+                         # Let's stick to 1 level depth (Project -> Subtask) as per current design.
+                return s
+
+            # Render Category
+            # Calculate Category Total (Sum of all tasks in cat)
+            cat_total = sum([t.get('total_seconds', 0) for t in cat_tasks])
+            
+            with st.expander(f"📂 **{cat}**  —  ⏱️ {format_time(cat_total)}", expanded=True):
+                # Render Projects/Tasks
+                # We interpret "Project" as any task that is a Parent to someone.
+                
+                # Identify projects among roots (or even non-roots?)
+                # We iterate roots to keep tree structure.
+                
+                # What if a task in this category is a child of someone?
+                # Then it shouldn't be shown as a root.
+                # We filtered `roots` as (pid is Empty). This is correct for top-level.
+                # But what if a task IS a child, but its parent is in ANOTHER category? 
+                # Our filter `pid` checks existence.
+                # If `pid` exists, it's NOT a root. It won't appear here? 
+                # Yes, that's a problem. It should appear if its parent is not found/not in view?
+                # For now, let's assume strict Project->Subtask structure.
+                
+                # Fix: We iterate ALL tasks in category.
+                # If task has NO parent -> It's a Root.
+                # If task HAS parent -> It's a Child. We show it under its Parent (if Parent in same cat).
+                # If Parent NOT in same cat -> Show as Root (Orphaned in this view)?
+                
+                # Better approach: Just list Projects (parents) and their children.
+                # And "Standalone" tasks.
+                
+                # Processed IDs to avoid duplicates
+                processed_ids = set()
+                
+                # 1. Parents (Projects)
+                # Find tasks in this category that ARE parents
+                # Check global parent usage
+                all_parents = {k.get('parent_id') for k in st.session_state.tasks if k.get('parent_id')}
+                
+                # Sort roots by name
+                roots = sorted(roots, key=lambda x: x.get('name', ''))
+                
+                for r in roots:
+                    rid = r.get('id', '')
+                    rname = r.get('name', '')
+                    rtime = r.get('total_seconds', 0)
+                    
+                    is_project = rid in all_parents
+                    
+                    if is_project:
+                        # Calculate Project Total (Self + Children)
+                        # Find children (global)
+                        kids = [k for k in st.session_state.tasks if k.get('parent_id') == rid]
+                        kids_time = sum([k.get('total_seconds', 0) for k in kids])
+                        total_proj_time = rtime + kids_time
+                        
+                        st.markdown(f"#### 🏗️ {rname} <span style='color:gray; font-size:0.8em'>({format_time(total_proj_time)})</span>", unsafe_allow_html=True)
+                        
+                        # Show Self detail?
+                        st.text(f"  • {rname} (Mgmt): {format_time(rtime)}")
+                        
+                        # Show Children
+                        for k in kids:
+                            kname = k.get('name', '')
+                            ktime = k.get('total_seconds', 0)
+                            st.text(f"  ↳ {kname}: {format_time(ktime)}")
+                            
+                    else:
+                        # Standalone Task
+                        st.markdown(f"**📄 {rname}**: {format_time(rtime)}")
+                        
+                # Handle "Orphans" (Tasks in this category whose parent is elsewhere)
+                # They were excluded from 'roots' because they have a PID.
+                # We should verify if they were displayed.
+                # If parent is NOT in this category, we might missed them?
+                # Let's add a check:
+                # Any task in `cat_tasks` that has `pid` BUT `pid` is not in `cat_tasks`?
+                
+                orphans = [t for t in cat_tasks if t.get('parent_id') and t.get('parent_id') not in [x.get('id') for x in cat_tasks]]
+                if orphans:
+                    st.markdown("---")
+                    st.caption("Linked to other Categories:")
+                    for o in orphans:
+                         oname = o.get('name','')
+                         otime = o.get('total_seconds', 0)
+                         pname = o.get('parent_id') # ID
+                         st.text(f"  ↳ {oname}: {format_time(otime)} (Parent: {pname})")
+
+
